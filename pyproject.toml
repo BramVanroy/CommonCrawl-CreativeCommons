@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools >= 64", "setuptools_scm>=8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpt_nl_copyright"
+dynamic = ["version"]
+authors = [
+    {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
+]
+maintainers = [
+    {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
+]
+description = "Automated data quality annotation"
+readme = "README.md"
+keywords = ["data creation", "copyrighted data", "data annotation"]
+license = {file = "LICENSE"}
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+]
+
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4",
+    "datasets",
+    "datatrove[io,s3,processing,multilingual,cli]",
+    "hf_transfer",
+    "huggingface_hub",
+    "pip",
+    "pydantic",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff"
+]
+
+[project.urls]
+homepage = "https://github.com/gpt-nl-copyright"
+documentation = "https://github.com/gpt-nl-copyright"
+issues = "https://github.com/gpt-nl-copyright/issues"
+repository = "https://github.com/gpt-nl-copyright.git"
+
+
+[project.scripts]
+
+# TOOLS
+[tool.setuptools]
+include-package-data = true
+license-files = ['LICEN[CS]E*']
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+version_file = "src/gpt_nl_copyright/version.py"
+
+[tool.ruff]
+line-length = 119
+fix = true  # Automatically apply fixes when running Ruff with `--fix`.
+
+[tool.ruff.lint]
+# Never enforce `E501` (line length violations).
+ignore = ["C901", "E501", "E741", "F402", "F823", "E402"]
+select = ["C", "E", "F", "W", "I"]
+
+# Ignore import violations in all `__init__.py` files.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403", "F811"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+known-first-party = ["gpt_nl_copyright"]
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
