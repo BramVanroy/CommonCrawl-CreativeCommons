@@ -1,7 +1,7 @@
 from datatrove.data import DocumentsPipeline
 from datatrove.pipeline.base import PipelineStep
 
-from gpt_nl_copyright.copyright_finder import find_cc_licenses_in_html, find_best_license
+from gpt_nl_copyright.copyright_finder import find_cc_licenses_in_html
 
 
 class CopyrightAnnotator(PipelineStep):
