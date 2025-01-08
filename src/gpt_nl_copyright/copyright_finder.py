@@ -1,144 +1,121 @@
-"""
-This file borrows from the work done by Robin Van Craenenbroek in ML6's Fondant project. The original source code can be found here:
-https://github.com/ml6team/fondant-usecase-filter-creative-commons/blob/f4fc645bfc8eb9bf244565b9bce40cadd16d3597/image_extraction/components/extract_images_from_warc/src/main.py
-"""
-
+import json
 import re
 from typing import Literal
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote
 
-from bs4 import BeautifulSoup, Tag, XMLParsedAsHTMLWarning
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import warnings
+
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-CC_LICENSES = ("by-nc-sa", "by-nc-nd", "by-nc", "by-nd", "by-sa", "by")
+CC_ABBR_TO_LICENSE = {
+    "by",
+    "by-sa",
+    "by-nd",
+    "by-nc",
+    "by-nc-sa",
+    "by-nc-nd",
+    "zero",
+    "certification",
+    "mark",
+}
 
 
-def get_license_from_html(html: str) -> tuple[Literal["public domain", "by-nc-sa", "by-nc-nd", "by-nc", "by-nd", "by-sa", "by", None], None | str]:
-    """Returns the license from the parsed html code.
-    Args:
-        html: The parsed html code.
-    Returns:
-        The license.
+# Add typing for location type
+location_type = Literal["meta_tag", "a_tag", "link_tag", "json-ld"]
+abbr_type = Literal["cc-unknown", "by", "by-sa", "by-nd", "by-nc", "by-nc-sa", "by-nc-nd", "zero", "certification", "mark"]
+
+
+def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None]:
     """
-    licenses = []
-    try:
-        soup = BeautifulSoup(html, "html.parser")
-    except Exception:
-        pass
-    else:
-        for a_tag in soup.find_all("a"):
-            if a_tag.has_attr("href") and "creativecommons.org" in a_tag["href"]:
-                href = unquote(a_tag["href"])
-                license_type, license_path = get_license_type_from_creative_commons_url(href)
-                if license_type is not None:
-                    license_location = get_license_location(a_tag)
-                    licenses.append((license_type, license_path, license_location))
-
-    if len(licenses) == 0:
+    Given a URL that might be from creativecommons.org,
+    try to parse out the license type and version.
+    Returns a string like 'CC BY-NC-ND 4.0' or None if not recognized.
+    """
+    # Normalize to lowercase for easier parsing
+    url_lower = unquote(license_url).lower()
+    
+    if "creativecommons.org" not in url_lower:
         return None, None
-    elif len(licenses) == 1:
-        return licenses[0][:-1]
+    
+    # Typical CC license URLs look like:
+    #   https://creativecommons.org/licenses/by-nc-nd/4.0/
+    # or
+    #   https://creativecommons.org/publicdomain/zero/1.0/
+    match = re.search(r'creativecommons\.org/(?:licenses|publicdomain)/([^/]+)/(\d\.\d)', url_lower)
+    if not match:
+        return "cc-unknown", None
+    
+    license_code = match.group(1)  # e.g. 'by-nc-nd' or 'zero'
+    license_code = re.sub(r"^[^a-z]+|[^a-z]+$", "", license_code)
+    version = match.group(2)       # e.g. '4.0' or '1.0'
+        
+    if license_code in CC_ABBR_TO_LICENSE:
+        return license_code, version
     else:
-        # If multiple licenses found, prefer the license in the footer as "most sensible"
-        for license in licenses:
-            if license[2] == "footer":
-                return license[:-1]
-
-        # If no license in the footer, return the first license
-        return licenses[0][:-1]
+        return "cc-unknown", None
 
 
-def get_license_location(element: Tag) -> str:
-    """Returns the license location from the parsed html code.
-    Args:
-        element: The parsed html code.
-    Returns:
-        The license location.
+def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str|None, location_type]]:
     """
-    parent = element.parent
-
-    if parent is None:  # could not find an apprioriate tag
-        return "other"
-
-    if parent.name == "footer" or tag_has_id_or_class_with_text(parent, "footer"):
-        return "footer"
-    elif (
-        parent.name == "aside"
-        or tag_has_id_or_class_with_text(parent, "aside")
-        or tag_has_id_or_class_with_text(parent, "sidebar")
-    ):
-        return "aside"
-    else:
-        return get_license_location(parent)
-
-
-def tag_has_id_or_class_with_text(tag: Tag, string: str) -> bool:
-    """Returns True if the tag has an id or class that contains the given string.
-    Args:
-        tag: The tag to check.
-        string: The string to check for.
-    Returns:
-        True if the tag has an id or class that contains the given string.
+    Returns a list of tuples (cc_license_string, location_found),
+    covering as many metadata locations as possible.
     """
-    if tag.has_attr("id") and string in tag["id"]:
-        return True
-    if tag.has_attr("class"):
-        for class_ in tag["class"]:
-            if string in class_:
-                return True
-    return False
+    soup = BeautifulSoup(html, "html.parser")
+    results = []
+    def parse_content_license(content: str, license_place: str):
+        if content:
+            license_abbr, license_version = parse_cc_license_url(content)
+            if license_abbr:
+                results.append((license_abbr, license_version, license_place))
 
+    # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
+    for meta_tag in soup.find_all("meta"):
+        meta_name = meta_tag.get("name", "") or meta_tag.get("property", "")
+        if meta_name.lower() in ["license", "og:license"]:
+            parse_content_license(meta_tag.get("content"), "meta_tag")
 
-def get_license_type_from_creative_commons_url(
-    license_url: str,
-) -> tuple[Literal["public domain", "by-nc-sa", "by-nc-nd", "by-nc", "by-nd", "by-sa", "by", None], None | str]:
-    """Returns the license type from the creative commons url.
-    Args:
-        license_url: The creative commons url.
-    Returns:
-        The license type.
-    """
-    # License path may also include the language, e.g. /licenses/by/4.0/deed.en, or the specific
-    # version, e.g. /licenses/by/4.0, so we keep it
-    try:
-        license_path = urlparse(license_url).path.strip("/")
-        license_split = license_path.split("/")
-    except ValueError:
-        return None, None
+    # Check <link href="..."> or <a href="..."> for its "href" attribute
+    for tag in soup.find_all(("link", "a")):            
+        parse_content_license(tag.get("href"), f"{tag.name}_tag")
 
-    if "publicdomain" in license_split:
-        return "public domain", license_path
-    else:
-        for short_license in license_split:
-            if "by" in short_license.lower():
-                short_license = refine_cc_license(short_license)
-                if short_license is not None:
-                    return short_license, license_path
+    # Check JSON-LD (Schema.org) for "license": "...", usually in <script type="application/ld+json">
+    # Example JSON-LD:
+    # <script type="application/ld+json">
+    # {
+    #     "@context": "http://schema.org",
+    #     "@type": "CreativeWork",
+    #     "license": {
+    #         "@type": "CreativeWork",
+    #         "url": "https://creativecommons.org/licenses/by-nc-nd/4.0/"
+    #     }
+    # }    
+    for script_tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        try:
+            data = json.loads(script_tag.string or "")
+            # data could be a list or dict
+            if isinstance(data, dict):
+                data_list = [data]
+            elif isinstance(data, list):
+                data_list = data
+            else:
+                data_list = []
 
-    return None, None
-
-
-def refine_cc_license(license: str) -> Literal["by-nc-sa", "by-nc-nd", "by-nc", "by-nd", "by-sa", "by", None]:
-    """
-    Retrieve the Creative Commons license from a string. Exact filtering is done to avoid cases where URLs coincidentally
-    contain `by`, e.g. `astrology-by-sfgate-uncover-your-cosmic-destiny`.
-
-    Args:
-        license: The license string with potential noise.
-    Returns:
-        The Creative Commons license, or None if it could not be found.
-    """
-    license = license.lower()
-    # Strip non-alphabetic characters from the beginning and end of the string
-    license = re.sub(r"^[^a-z]+|[^a-z]+$", "", license)
-
-    # Splitting because sometimes a URL is malformed and contains the license in the URL with a space between
-    # E.g. "licenses by-nc-nd"
-    for chunk in license.split():
-        for valid_license in CC_LICENSES:
-            if valid_license == chunk:
-                return valid_license
-
-    return None
+            for item in data_list:
+                if isinstance(item, dict) and "license" in item:
+                    license_val = item["license"]
+                    # license_val might be a string or dict (if typed)
+                    if isinstance(license_val, dict):
+                        # Some schema.org usage might embed the URL in "@id" or "url"
+                        license_url = license_val.get("@id") or license_val.get("url")
+                        parse_content_license(license_url, "json-ld")
+                    elif isinstance(license_val, str):                        
+                        parse_content_license(license_val, "json-ld")
+        except json.JSONDecodeError:
+            continue
+    
+    # If multiple licenses found, order of preference: meta_tag, json-ld, link_tag, a_tag
+    location_order = {"meta_tag": 0, "json-ld": 1, "link_tag": 2, "a_tag": 3}
+    results.sort(key=lambda x: location_order.get(x[2], 4))
+    return results
