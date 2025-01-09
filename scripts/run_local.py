@@ -15,6 +15,7 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
+from gpt_nl_copyright.components.column_filter import ColumnFilter
 from gpt_nl_copyright.components.copyright import CopyrightAnnotator
 from gpt_nl_copyright.components.html_copier import HtmlCopier
 
@@ -38,6 +39,10 @@ class Config(BaseModel):
     randomize_start_duration: int = 0
     lang_filter_language_threshold: float = 0.65
     languages: list = LANGUAGES
+    output_text: bool = True
+    output_html: bool = False
+    keep_with_license_only: bool = False
+
 
 
 def main(
@@ -51,11 +56,8 @@ def main(
         config = {}
     extract_cfg = Config(**config)
 
-    d_base_filter = f"{output_path}/base_processing"
-
-    main_processing_executor = LocalPipelineExecutor(
-        pipeline=[
-            WarcReader(
+    pipeline = [
+        WarcReader(
                 f"s3://commoncrawl/crawl-data/{dump}/segments/",
                 glob_pattern="*/warc/*",
                 default_metadata={"dump": dump},
@@ -67,8 +69,16 @@ def main(
                 languages=extract_cfg.languages, language_threshold=extract_cfg.lang_filter_language_threshold
             ),
             CopyrightAnnotator(),
-            JsonlWriter(f"{d_base_filter}/output/{dump}", expand_metadata=True),
-        ],
+    ]
+    
+    pipeline.extend([
+        ColumnFilter(output_text=extract_cfg.output_text, output_html=extract_cfg.output_html),
+        JsonlWriter(f"{output_path}/data", expand_metadata=True),
+    ])
+
+
+    main_processing_executor = LocalPipelineExecutor(
+        pipeline=pipeline,
         tasks=extract_cfg.tasks,
         workers=extract_cfg.workers,
         logging_dir=f"{output_path}/logs/base_processing/{dump}",

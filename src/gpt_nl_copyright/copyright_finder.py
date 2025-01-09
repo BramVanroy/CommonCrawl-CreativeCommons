@@ -3,7 +3,7 @@ import re
 from typing import Literal
 from urllib.parse import unquote
 
-from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+from bs4 import BeautifulSoup, ParserRejectedMarkup, XMLParsedAsHTMLWarning
 import warnings
 
 
@@ -57,13 +57,33 @@ def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None
         return "cc-unknown", None
 
 
+class ParserException(Exception):
+    """An Exception to be raised when all parsers fail"""
+    def __init__(self, message_or_exception):
+        if isinstance(message_or_exception, Exception):
+            e = message_or_exception
+            message_or_exception = "%s: %s" % (e.__class__.__name__, str(e))
+        super().__init__(message_or_exception)
+
+
 def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str|None, location_type]]:
     """
     Returns a list of tuples (cc_license_string, location_found),
     covering as many metadata locations as possible.
     """
-    soup = BeautifulSoup(html, "html.parser")
     results = []
+
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        try:
+            soup = BeautifulSoup(html, "html5lib")
+        except Exception:
+            try:
+                soup = BeautifulSoup(html, "lxml")
+            except Exception:
+                raise ParserException("Could not parse the document with html.parser, html5lib, nor lxml.")
+
     def parse_content_license(content: str, license_place: str):
         if content:
             license_abbr, license_version = parse_cc_license_url(content)

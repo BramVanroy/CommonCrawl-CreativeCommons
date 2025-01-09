@@ -34,7 +34,9 @@ dependencies = [
     "datasets",
     "datatrove[io,s3,processing,multilingual,cli]",
     "hf_transfer",
+    "html5lib",
     "huggingface_hub",
+    "lxml",
     "pip",
     "pydantic",
 ]
