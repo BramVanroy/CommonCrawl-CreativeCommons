@@ -64,6 +64,7 @@ def main(
                 f"s3://commoncrawl/crawl-data/{dump}/segments/",
                 glob_pattern="*/warc/*",
                 default_metadata={"dump": dump},
+                # limit=100,
             ),
             URLFilter(),
             HtmlCopier(),

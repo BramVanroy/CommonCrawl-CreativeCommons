@@ -1,4 +1,5 @@
 import dataclasses
+import os
 
 from datatrove.data import Document
 
@@ -25,3 +26,14 @@ def prepare_for_writing(self, document: Document, output_text: bool = True, outp
         data.pop("html", None)
 
     return data
+
+def print_system_stats():
+    """
+    Print out the number of CPU cores on the system as well as the available memory.
+    """
+    print(f"Number of CPU cores: {os.cpu_count()}")
+
+    try:
+        print(f"Available memory: {os.popen('free -h').read()}")
+    except Exception:
+        pass
