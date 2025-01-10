@@ -76,7 +76,7 @@ def main(
         tasks=cfg.tasks,
         time=cfg.time,
         logging_dir=f"{output_path}/logs/main/",
-        slurm_logs_folder="logs/slurm/main",
+        slurm_logs_folder=f"{output_path}/slurm-logs/main",
         randomize_start_duration=cfg.randomize_start_duration,  # don't hit the bucket all at once with the list requests
         mem_per_cpu_gb=cfg.mem_per_cpu_gb,
         partition=partition,
@@ -107,7 +107,7 @@ def main(
                 ),
             ],
             logging_dir=f"{output_path}/logs/lang-writer-{lang}/",
-            slurm_logs_folder=f"logs/slurm/lang-writer-{lang}/",
+            slurm_logs_folder=f"{output_path}/slurm-logs/lang-writer-{lang}/",
             depends=main_processing_executor,
             tasks=cfg.tasks,
             time=cfg.writing_time,
@@ -119,75 +119,6 @@ def main(
             sbatch_args=sbatch_args,
         ).run()
 
-
-if __name__ == "__main__":
-    import argparse
-
-    cparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    cparser.add_argument(
-        "-d",
-        "--dump",
-        type=str,
-        required=True,
-        help="CommonCrawl dump, e.g. 'CC-MAIN-2024-51' (see https://commoncrawl.org/overview)",
-    )
-    cparser.add_argument("-o", "--output_path", type=str, required=True, help="Output path")
-    cparser.add_argument(
-        "-c",
-        "--pipelines_config",
-        default=None,
-        type=str,
-        help="Path to the pipelines YAML config file. If not given will use default values.",
-    )
-
-    cli_kwargs = vars(cparser.parse_args())
-    main(**cli_kwargs)
-
-#  =====================================================================================================================
-
-def main(
-    dump: str,
-    output_path: str,
-    partition: str,
-    pipelines_config: str,
-    venv_path: str | None = None,
-    account: str | None = None,
-):
-    config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
-    sbatch_args = {"account": account} if account else {}
-
-    extract_cfg = Config(**config)
-
-    d_base_filter = f"{output_path}/base_processing"
-
-    main_processing_executor = SlurmPipelineExecutor(
-        job_name=f"cc_{dump}",
-        pipeline=[
-            WarcReader(
-                f"s3://commoncrawl/crawl-data/{dump}/segments/",
-                glob_pattern="*/warc/*",
-                default_metadata={"dump": dump},
-            ),
-            URLFilter(),
-            CopyrightAnnotator(),
-            Trafilatura(favour_precision=True, timeout=600.0),
-            LanguageFilter(
-                languages=extract_cfg.languages, language_threshold=extract_cfg.lang_filter_language_threshold
-            ),
-            JsonlWriter(f"{d_base_filter}/output/{dump}"),
-        ],
-        tasks=extract_cfg.tasks,
-        time=extract_cfg.time,
-        logging_dir=f"{output_path}/logs/base_processing/{dump}",
-        slurm_logs_folder=f"slurm-logs/base_processing/{dump}/slurm_logs",  # must be local
-        randomize_start_duration=extract_cfg.randomize_start_duration,  # don't hit the bucket all at once with the list requests
-        mem_per_cpu_gb=extract_cfg.mem_per_cpu_gb,
-        partition=partition,
-        venv_path=venv_path,
-        qos="",
-        sbatch_args=sbatch_args,
-    )
-    main_processing_executor.run()
 
 
 if __name__ == "__main__":
