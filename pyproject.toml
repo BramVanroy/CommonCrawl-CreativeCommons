@@ -37,6 +37,7 @@ dependencies = [
     "html5lib",
     "huggingface_hub",
     "lxml",
+    "lxml_html_clean",
     "pip",
     "pydantic",
 ]
