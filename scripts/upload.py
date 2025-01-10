@@ -27,7 +27,7 @@ def main(local_path: str, hf_repo: str, config_name: str | None = None, max_shar
     ds.push_to_hub(
         repo_id=hf_repo,
         config_name=config_name if config_name else "default",
-        data_dir=config_name.replace("--", "/") if config_name else None,  
+        data_dir=config_name.replace("--", "/") if config_name else None,
         max_shard_size=max_shard_size,
         private=not public,
         commit_message=f"Upload to {hf_repo} with config {config_name} and max_shard_size {max_shard_size}",

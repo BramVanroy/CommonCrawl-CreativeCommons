@@ -119,7 +119,7 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
     """
     from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-    
+
     results = []
 
     try:

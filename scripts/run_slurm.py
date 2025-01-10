@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from gpt_nl_copyright.components.annotator.copyright_annotator import CopyrightAnnotator
 from gpt_nl_copyright.components.annotator.html_annotator import HtmlCopier
+from gpt_nl_copyright.components.filters.empty_text_filter import EmptyTextFilter
 from gpt_nl_copyright.components.filters.lang_mtd_filter import LanguageMetadataFilter
 from gpt_nl_copyright.components.filters.license_filter import CopyrightFilter
 from gpt_nl_copyright.utils import prepare_for_writing, print_system_stats
@@ -71,8 +72,10 @@ def main(
                 default_metadata={"dump": dump},
             ),
             URLFilter(),
+            EmptyTextFilter(),  # filter empty HTML
             HtmlCopier(),
             Trafilatura(favour_precision=True, timeout=600.0),
+            EmptyTextFilter(),  # filter empty extracted text
             LanguageFilter(languages=cfg.languages, language_threshold=cfg.lang_filter_language_threshold),
             CopyrightAnnotator(),
             CopyrightFilter(),
