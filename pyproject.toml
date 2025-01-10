@@ -32,7 +32,7 @@ requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4",
     "datasets",
-    "datatrove[io,s3,processing,multilingual,cli]",
+    "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/BramVanroy/datatrove",
     "hf_transfer",
     "html5lib",
     "huggingface_hub",

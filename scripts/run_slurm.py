@@ -1,3 +1,4 @@
+import re
 from functools import partial
 from pathlib import Path
 
@@ -43,6 +44,10 @@ class Config(BaseModel):
     keep_with_license_only: bool = True
 
 
+def job_id_retriever(job_id: str) -> str:
+    return re.search(r"Submitted batch job (\d+)", job_id).group(1)
+
+
 def main(
     dump: str,
     output_path: str,
@@ -73,6 +78,7 @@ def main(
             CopyrightFilter(),
             JsonlWriter(output_folder=all_output_path),
         ],
+        job_id_retriever=job_id_retriever,
         tasks=cfg.tasks,
         time=cfg.time,
         logging_dir=f"{output_path}/logs/main/",
@@ -106,6 +112,7 @@ def main(
                     adapter=no_html,
                 ),
             ],
+            job_id_retriever=job_id_retriever,
             logging_dir=f"{output_path}/logs/lang-writer-{lang}/",
             slurm_logs_folder=f"{output_path}/slurm-logs/lang-writer-{lang}/",
             depends=main_processing_executor,
