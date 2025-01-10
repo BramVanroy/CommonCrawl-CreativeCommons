@@ -21,7 +21,7 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
-from gpt_nl_copyright.components.copyright import CopyrightAnnotator
+from gpt_nl_copyright.components.annotator.copyright_annotator import CopyrightAnnotator
 
 
 # Dutch, Frisian, English, Spanish, French, Italian, German, Afrikaans

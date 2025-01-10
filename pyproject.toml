@@ -68,10 +68,8 @@ version_file = "src/gpt_nl_copyright/version.py"
 
 [tool.ruff]
 line-length = 119
-fix = true  # Automatically apply fixes when running Ruff with `--fix`.
 
 [tool.ruff.lint]
-# Never enforce `E501` (line length violations).
 ignore = ["C901", "E501", "E741", "F402", "F823", "E402"]
 select = ["C", "E", "F", "W", "I"]
 

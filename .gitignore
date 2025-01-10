@@ -1,6 +1,7 @@
 configs/
 output/
 scratches/
+tmp/
 
 src/gpt_copyright/version.py
 
