@@ -4,19 +4,15 @@ import warnings
 from typing import Literal
 from urllib.parse import unquote
 
-from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from datatrove.data import Document
 
 from gpt_nl_copyright.components.annotator.base import BaseAnnotator
 
 
-warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-
-
 class CopyrightAnnotator(BaseAnnotator):
     name = "©️ Copyright Annotator"
 
-    _requires_dependencies = ["bs4"]
+    _requires_dependencies = [("bs4", "beautifulsoup4")]
 
     def __init__(self):
         super().__init__()
@@ -121,6 +117,9 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
     Returns a list of tuples (cc_license_string, location_found),
     covering as many metadata locations as possible.
     """
+    from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+    
     results = []
 
     try:
