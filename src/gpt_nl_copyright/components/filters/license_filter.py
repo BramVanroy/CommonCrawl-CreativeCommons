@@ -2,7 +2,7 @@ from datatrove.data import Document
 from datatrove.pipeline.filters.base_filter import BaseFilter
 
 
-class CopyrightFilter(BaseFilter):
+class LicenseFilter(BaseFilter):
     """Filter out documents that do not contain CreativeCommons copyright information"""
 
     name = "🛡️ Copyright Filter"

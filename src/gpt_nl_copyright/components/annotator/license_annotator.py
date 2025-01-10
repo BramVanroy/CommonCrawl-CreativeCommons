@@ -4,13 +4,14 @@ import warnings
 from typing import Literal
 from urllib.parse import unquote
 
+from bs4 import Tag
 from datatrove.data import Document
 
 from gpt_nl_copyright.components.annotator.base import BaseAnnotator
 
 
-class CopyrightAnnotator(BaseAnnotator):
-    name = "©️ Copyright Annotator"
+class LicenseAnnotator(BaseAnnotator):
+    name = "©️ License Annotator"
 
     _requires_dependencies = [("bs4", "beautifulsoup4")]
 
@@ -66,7 +67,7 @@ CC_ABBR_TO_LICENSE = {
 
 
 # Add typing for location type
-location_type = Literal["meta_tag", "a_tag", "link_tag", "json-ld"]
+location_type = Literal["meta_tag", "a_tag", "a_tag_in_footer", "link_tag", "json-ld"]
 abbr_type = Literal[
     "cc-unknown", "by", "by-sa", "by-nd", "by-nc", "by-nc-sa", "by-nc-nd", "zero", "certification", "mark"
 ]
@@ -133,10 +134,13 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
             except Exception:
                 raise ParserException("Could not parse the document with html.parser, html5lib, nor lxml.")
 
-    def parse_content_license(content: str, license_place: str):
+    def parse_content_license(content: str, license_place: str, tag: Tag = None):
         if content:
             license_abbr, license_version = parse_cc_license_url(content)
             if license_abbr:
+                if tag is not None and license_place == "a_tag" and has_footer_ancestor(tag):
+                        license_place = "a_tag_in_footer"
+
                 results.append((license_abbr, license_version, license_place))
 
     # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
@@ -147,7 +151,7 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
 
     # Check <link href="..."> or <a href="..."> for its "href" attribute
     for tag in soup.find_all(("link", "a")):
-        parse_content_license(tag.get("href"), f"{tag.name}_tag")
+        parse_content_license(tag.get("href"), f"{tag.name}_tag", tag if tag.name == "a" else None)
 
     # Check JSON-LD (Schema.org) for "license": "...", usually in <script type="application/ld+json">
     # Example JSON-LD:
@@ -184,7 +188,18 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
         except json.JSONDecodeError:
             continue
 
-    # If multiple licenses found, order of preference: meta_tag, json-ld, link_tag, a_tag
-    location_order = {"meta_tag": 0, "json-ld": 1, "link_tag": 2, "a_tag": 3}
+    # If multiple licenses found, order of preference: meta_tag, json-ld, link_tag, a_tag_in_footer, a_tag
+    location_order = {"meta_tag": 0, "json-ld": 1, "link_tag": 2, "a_tag_in_footer": 3, "a_tag": 4}
     results.sort(key=lambda x: location_order.get(x[2], 4))
     return results
+
+def has_footer_ancestor(tag: Tag) -> bool:
+    """
+    Check if the tag has a footer ancestor
+    """
+    if tag is None:
+        return False
+    if tag.name == "footer" or any("footer" in cls for cls in tag.get("class", [])) or "footer" in tag.get("id", ""):
+        return True
+    
+    return has_footer_ancestor(tag.parent)
