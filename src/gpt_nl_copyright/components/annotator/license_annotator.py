@@ -199,7 +199,7 @@ def has_footer_ancestor(tag: Tag) -> bool:
     """
     if tag is None:
         return False
-    if tag.name == "footer" or any("footer" in cls for cls in tag.get("class", [])) or "footer" in tag.get("id", ""):
+    if tag.name.lower() == "footer" or any("footer" in cls.lower() for cls in tag.get("class", [])) or "footer" in tag.get("id", "").lower():
         return True
     
     return has_footer_ancestor(tag.parent)
