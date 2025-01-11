@@ -13,8 +13,8 @@ from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
-from gpt_nl_copyright.components.annotator.license_annotator import LicenseAnnotator
 from gpt_nl_copyright.components.annotator.html_annotator import HtmlCopier
+from gpt_nl_copyright.components.annotator.license_annotator import LicenseAnnotator
 from gpt_nl_copyright.components.filters.empty_text_filter import EmptyTextFilter
 from gpt_nl_copyright.components.filters.lang_mtd_filter import LanguageMetadataFilter
 from gpt_nl_copyright.components.filters.license_filter import LicenseFilter
@@ -32,6 +32,7 @@ LANGUAGES = [
     "de",
     "af",
 ]
+
 
 class Config(BaseModel):
     tasks: int
@@ -128,7 +129,6 @@ def main(
             qos="",
             sbatch_args=sbatch_args,
         ).run()
-
 
 
 if __name__ == "__main__":

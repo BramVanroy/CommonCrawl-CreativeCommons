@@ -27,6 +27,7 @@ def prepare_for_writing(self, document: Document, output_text: bool = True, outp
 
     return data
 
+
 def print_system_stats():
     """
     Print out the number of CPU cores on the system as well as the available memory.
