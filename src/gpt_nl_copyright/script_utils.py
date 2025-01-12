@@ -44,7 +44,6 @@ class LocalConfig(_BaseConfig):
 
 class SlurmConfig(_BaseConfig):
     time: str
-    writing_time: str
     mem_per_cpu_gb: int = 2
     cpus_per_task: int = 1
 
