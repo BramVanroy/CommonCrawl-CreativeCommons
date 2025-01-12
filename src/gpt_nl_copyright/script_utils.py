@@ -83,7 +83,6 @@ def build_pipeline(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
             glob_pattern="*/warc/*",
             default_metadata={"dump": dump},
-            limit=100,
         ),
         URLFilter(),
         EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
