@@ -86,12 +86,12 @@ def build_pipeline(
             limit=100,
         ),
         URLFilter(),
-        EmptyTextFilter(),  # filter empty HTML
+        EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
         LicenseAnnotator(),
         LicenseFilter(),
         Trafilatura(favour_precision=True, timeout=600.0),
-        EmptyTextFilter(),  # filter empty extracted text
         LanguageFilter(languages=languages, language_threshold=language_threshold),
+        EmptyTextFilter(),  # filter items with empty extracted text
         JsonlWriter(
             output_folder=f"{output_path}/data/without_text/",
             adapter=no_text_no_html,
