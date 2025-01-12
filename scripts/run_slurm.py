@@ -40,7 +40,7 @@ def main(
         time=cfg.time,
         logging_dir=f"{output_path}/logs/main/",
         slurm_logs_folder=f"{output_path}/slurm-logs/main",
-        randomize_start_duration=cfg.randomize_start_duration,  # don't hit the bucket all at once with the list requests
+        randomize_start_duration=cfg.randomize_start_duration,
         mem_per_cpu_gb=cfg.mem_per_cpu_gb,
         partition=partition,
         venv_path=venv_path,

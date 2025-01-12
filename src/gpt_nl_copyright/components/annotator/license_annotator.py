@@ -116,8 +116,6 @@ class ParserException(Exception):
             message_or_exception = "%s: %s" % (e.__class__.__name__, str(e))
         super().__init__(message_or_exception)
 
-import warnings
-
 
 def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, location_type]]:
     """
