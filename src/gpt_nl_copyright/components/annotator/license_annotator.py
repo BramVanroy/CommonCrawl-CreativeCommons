@@ -15,11 +15,15 @@ class LicenseAnnotator(BaseAnnotator):
 
     _requires_dependencies = [("bs4", "beautifulsoup4")]
 
-    def __init__(self):
+    def __init__(self, html_in_metadata: bool = False):
         super().__init__()
+        self.html_in_metadata = html_in_metadata
 
     def annotate(self, doc: Document) -> Document:
-        html = doc.metadata["html"]
+        if self.html_in_metadata:
+            html = doc.metadata["html"]
+        else:
+            html = doc.text
 
         license_abbr = None
         license_version = None
