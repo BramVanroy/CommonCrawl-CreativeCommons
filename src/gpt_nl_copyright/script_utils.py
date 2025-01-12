@@ -36,6 +36,7 @@ class _BaseConfig(BaseModel):
     language_threshold: float = 0.65
     languages: list = LANGUAGES
     keep_with_license_only: bool = True
+    limit: int = -1
 
 
 class LocalConfig(_BaseConfig):
@@ -73,7 +74,7 @@ def prepare_for_writing(self, document: Document, output_text: bool = True, outp
 
 
 def build_pipeline(
-    dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65
+    dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65, limit: int = -1
 ) -> list[PipelineStep]:
     # Write two version to jsonl, one with the HTML removed and one with both text and HTML removed
     no_text_no_html = partial(prepare_for_writing, output_text=False, output_html=False)
@@ -83,6 +84,7 @@ def build_pipeline(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
             glob_pattern="*/warc/*",
             default_metadata={"dump": dump},
+            limit=limit,
         ),
         URLFilter(),
         EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)

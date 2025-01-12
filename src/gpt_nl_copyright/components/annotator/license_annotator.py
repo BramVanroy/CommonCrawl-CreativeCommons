@@ -4,7 +4,6 @@ import warnings
 from typing import Literal
 from urllib.parse import unquote
 
-from bs4 import Tag
 from datatrove.data import Document
 
 from gpt_nl_copyright.components.annotator.base import BaseAnnotator
@@ -32,8 +31,8 @@ class LicenseAnnotator(BaseAnnotator):
         license_parse_error = None
         license_disagreement = None
 
-        # List of tuples (license_abbr, license_version, location_found)
         try:
+            # List of tuples (license_abbr, license_version, location_found)
             potential_licenses = find_cc_licenses_in_html(html)
         except Exception:
             license_parse_error = True
@@ -78,10 +77,13 @@ abbr_type = Literal[
 
 
 def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None]:
-    """
-    Given a URL that might be from creativecommons.org,
-    try to parse out the license type and version.
-    Returns a string like 'CC BY-NC-ND 4.0' or None if not recognized.
+    """Given a URL that might be from creativecommons.org, try to parse out the license type and version.
+
+    Args:
+        license_url: the URL to parse
+
+    Returns:
+        tuple[str, str]: the license abbreviation and version
     """
     # Normalize to lowercase for easier parsing
     url_lower = unquote(license_url).lower()
@@ -118,13 +120,21 @@ class ParserException(Exception):
 
 
 def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, location_type]]:
+    """Given an HTML document (as str), try to find Creative Commons license information.
+
+    Args:
+        html: the HTML document as a string
+
+    Returns:
+        list[tuple[str, str, str]]: a list of tuples with the license abbreviation, version, and location found
     """
-    Returns a list of tuples (cc_license_string, location_found),
-    covering as many metadata locations as possible.
-    """
-    from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+    from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning, Tag, XMLParsedAsHTMLWarning
 
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+    # Some files are malformed and only contain text like
+    # "Table './dlinksmf/smf_sessions' is marked as crashed and should be repaired"
+    # Those should not be parsed and simply be raised as an error
+    warnings.filterwarnings("error", category=MarkupResemblesLocatorWarning)
 
     results = []
     try:
@@ -142,6 +152,8 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
         if content:
             license_abbr, license_version = parse_cc_license_url(content)
             if license_abbr:
+                # We want to give higher priority to hyperlink licenses found in the footer
+                # so if this is a hyperlink license, and it's in the footer, we'll mark it as such
                 if tag is not None and license_place == "a_tag" and has_footer_ancestor(tag):
                     license_place = "a_tag_in_footer"
 
@@ -198,9 +210,14 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
     return results
 
 
-def has_footer_ancestor(tag: Tag) -> bool:
-    """
-    Check if the tag has a footer ancestor
+def has_footer_ancestor(tag) -> bool:
+    """Check if the tag has a footer ancestor
+
+    Args:
+        tag: the bs4 Tag to check
+
+    Returns:
+        bool: True if the tag has a footer ancestor, False otherwise
     """
     if tag is None:
         return False

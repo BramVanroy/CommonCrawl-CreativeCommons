@@ -22,6 +22,7 @@ def main(
         output_path=output_path,
         languages=cfg.languages,
         language_threshold=cfg.language_threshold,
+        limit=cfg.limit,
     )
     main_processing_executor = LocalPipelineExecutor(
         pipeline=pipeline,
