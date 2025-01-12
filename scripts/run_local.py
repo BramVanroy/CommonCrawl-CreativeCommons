@@ -2,9 +2,8 @@ from pathlib import Path
 
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
-from datatrove.pipeline.readers import JsonlReader
 
-from gpt_nl_copyright.script_utils import LocalConfig, build_lang_writer_pipeline, build_main_pipeline
+from gpt_nl_copyright.script_utils import LocalConfig, build_pipeline
 
 
 def main(
@@ -18,12 +17,11 @@ def main(
         config = {}
     cfg = LocalConfig(**config)
 
-    all_output_path = f"{output_path}/data/all-unfiltered/"
-    pipeline = build_main_pipeline(
+    pipeline = build_pipeline(
         dump=dump,
-        all_output_path=all_output_path,
+        output_path=output_path,
         languages=cfg.languages,
-        language_threshold=cfg.lang_filter_language_threshold,
+        language_threshold=cfg.language_threshold,
     )
     main_processing_executor = LocalPipelineExecutor(
         pipeline=pipeline,
@@ -33,22 +31,6 @@ def main(
         randomize_start_duration=cfg.randomize_start_duration,
     )
     main_processing_executor.run()
-
-    # Write the results to disk for each language seperately
-    reader = JsonlReader(all_output_path)
-    for lang in cfg.languages:
-        pipeline = build_lang_writer_pipeline(
-            reader=reader,
-            lang=lang,
-            output_path=output_path,
-        )
-        LocalPipelineExecutor(
-            pipeline=pipeline,
-            tasks=cfg.tasks,
-            workers=cfg.workers,
-            logging_dir=f"{output_path}/logs/lang-writer-{lang}/",
-            depends=main_processing_executor,
-        ).run()
 
 
 if __name__ == "__main__":

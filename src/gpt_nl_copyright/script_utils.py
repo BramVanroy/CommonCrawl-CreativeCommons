@@ -9,13 +9,12 @@ from datatrove.pipeline.filters import (
     LanguageFilter,
     URLFilter,
 )
-from datatrove.pipeline.readers import JsonlReader, WarcReader
+from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
 from gpt_nl_copyright.components.annotator.license_annotator import LicenseAnnotator
 from gpt_nl_copyright.components.filters.empty_text_filter import EmptyTextFilter
-from gpt_nl_copyright.components.filters.lang_mtd_filter import LanguageMetadataFilter
 from gpt_nl_copyright.components.filters.license_filter import LicenseFilter
 
 
@@ -34,7 +33,7 @@ LANGUAGES = [
 class _BaseConfig(BaseModel):
     tasks: int = 1
     randomize_start_duration: int = 0
-    lang_filter_language_threshold: float = 0.65
+    language_threshold: float = 0.65
     languages: list = LANGUAGES
     keep_with_license_only: bool = True
 
@@ -74,15 +73,18 @@ def prepare_for_writing(self, document: Document, output_text: bool = True, outp
     return data
 
 
-def build_main_pipeline(
-    dump: str, all_output_path: str, languages: list[str], language_threshold: float = 0.65
+def build_pipeline(
+    dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65
 ) -> list[PipelineStep]:
+    # Write two version to jsonl, one with the HTML removed and one with both text and HTML removed
+    no_text_no_html = partial(prepare_for_writing, output_text=False, output_html=False)
+    no_html = partial(prepare_for_writing, output_text=True, output_html=False)
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
             glob_pattern="*/warc/*",
             default_metadata={"dump": dump},
-            limit=6,
+            limit=100,
         ),
         URLFilter(),
         EmptyTextFilter(),  # filter empty HTML
@@ -91,26 +93,14 @@ def build_main_pipeline(
         Trafilatura(favour_precision=True, timeout=600.0),
         EmptyTextFilter(),  # filter empty extracted text
         LanguageFilter(languages=languages, language_threshold=language_threshold),
-        JsonlWriter(output_folder=all_output_path),
+        JsonlWriter(
+            output_folder=f"{output_path}/data/without_text/",
+            adapter=no_text_no_html,
+            output_filename="${language}/${rank}.jsonl.gz",
+        ),
+        JsonlWriter(
+            output_folder=f"{output_path}/data/with_text/",
+            adapter=no_html,
+            output_filename="${language}/${rank}.jsonl.gz",
+        ),
     ]
-
-
-def build_lang_writer_pipeline(reader: JsonlReader, lang: str, output_path: str) -> list[PipelineStep]:
-    # Write two version to jsonl, one with the HTML removed and one with both text and HTML removed
-    no_text_no_html = partial(prepare_for_writing, output_text=False, output_html=False)
-    no_html = partial(prepare_for_writing, output_text=True, output_html=False)
-
-    return (
-        [
-            reader,
-            LanguageMetadataFilter(lang),
-            JsonlWriter(
-                output_folder=f"{output_path}/data/{lang}/no_text_no_html/",
-                adapter=no_text_no_html,
-            ),
-            JsonlWriter(
-                output_folder=f"{output_path}/data/{lang}/no_html/",
-                adapter=no_html,
-            ),
-        ],
-    )

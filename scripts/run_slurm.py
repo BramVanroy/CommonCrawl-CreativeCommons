@@ -31,7 +31,7 @@ def main(
         dump=dump,
         all_output_path=all_output_path,
         languages=cfg.languages,
-        language_threshold=cfg.lang_filter_language_threshold,
+        language_threshold=cfg.language_threshold,
     )
     main_processing_executor = SlurmPipelineExecutor(
         pipeline=pipeline,
