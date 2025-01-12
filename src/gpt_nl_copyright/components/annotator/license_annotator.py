@@ -127,24 +127,16 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
     results = []
-
-    with warnings.catch_warnings(record=True) as w:
-        # Filter specific warning
-        warnings.filterwarnings("always", category=UserWarning)
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
         try:
-            soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(html, "html5lib")
         except Exception:
             try:
-                soup = BeautifulSoup(html, "html5lib")
+                soup = BeautifulSoup(html, "lxml")
             except Exception:
-                try:
-                    soup = BeautifulSoup(html, "lxml")
-                except Exception:
-                    raise ParserException("Could not parse the document with html.parser, html5lib, nor lxml.")
-        # Check if any warnings were caught
-        for warning in w:
-            if issubclass(warning.category, UserWarning) and "MarkupResemblesLocatorWarning" in str(warning.message):
-                print(f"Warning caught: {warning.message}. HTML looks like: {html[:100]}")
+                raise ParserException("Could not parse the document with html.parser, html5lib, nor lxml.")
 
     def parse_content_license(content: str, license_place: str, tag: Tag = None):
         if content:

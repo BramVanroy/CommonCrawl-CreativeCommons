@@ -1,4 +1,3 @@
-# Dutch, Frisian, English, Spanish, French, Italian, German, Afrikaans
 import dataclasses
 from functools import partial
 
@@ -18,6 +17,7 @@ from gpt_nl_copyright.components.filters.empty_text_filter import EmptyTextFilte
 from gpt_nl_copyright.components.filters.license_filter import LicenseFilter
 
 
+# Dutch, Frisian, English, Spanish, French, Italian, German, Afrikaans
 LANGUAGES = [
     "nl",
     "fy",

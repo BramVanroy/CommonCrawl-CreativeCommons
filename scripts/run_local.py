@@ -27,7 +27,7 @@ def main(
         pipeline=pipeline,
         tasks=cfg.tasks,
         workers=cfg.workers,
-        logging_dir=f"{output_path}/logs/main/",
+        logging_dir=f"{output_path}/logs/",
         randomize_start_duration=cfg.randomize_start_duration,
     )
     main_processing_executor.run()
