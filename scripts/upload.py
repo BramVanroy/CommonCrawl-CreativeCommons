@@ -10,6 +10,13 @@ from tqdm import tqdm
 
 
 def get_data_robust(pfiles):
+    """
+    Given a set of .jsonl.gz files, this function reads them in a robust way, skipping incomplete lines,
+    and yielding one sample at a time (parse-able JSON line).
+
+    :param pfiles: A list of .jsonl.gz files
+    :return: A generator yielding the contents of the files
+    """
     with tqdm(total=len(pfiles), desc="Reading", unit="file") as pbar:
         for pfin in pfiles:
             if pfin.stat().st_size == 0:
@@ -53,6 +60,8 @@ def main(
     :param public: Whether the repo should be public
     :param every: Upload every x minutes
     :param max_time: Maximum time to run in minutes
+    :param num_cpus: Number of CPUs to use -- only used if robust is not set
+    :param robust: Whether to read the JSONL files robustly, dropping incomplete lines
     """
     if every and not max_time:
         raise ValueError("If 'every' is set, 'max_time' must be set as well")
@@ -68,11 +77,14 @@ def main(
     while True:
         if robust:
             files = list(Path(local_path).rglob("*.jsonl.gz"))
-            has_files_with_contents = len(files) > 0 and any(f.stat().st_size > 0 for f in files)
-            if has_files_with_contents:
-                ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
+            if len(files) > 0:
+                has_files_with_contents = any(f.stat().st_size > 0 for f in files)
+                if has_files_with_contents:
+                    ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
+                else:
+                    raise DatasetGenerationError("All files are empty")
             else:
-                raise DatasetGenerationError("No files found or all files are empty")
+                raise DatasetGenerationError(f"No files found in {local_path}")
         else:
             print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
             ds = load_dataset("json", data_files=f"{local_path}/*.jsonl.gz", split="train", num_proc=num_cpus)
