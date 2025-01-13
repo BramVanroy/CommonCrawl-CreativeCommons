@@ -1,7 +1,33 @@
+import gzip
+import json
 import os
 import time
+from pathlib import Path
 
-from datasets import load_dataset
+from datasets import Dataset, DatasetGenerationError, load_dataset
+from tqdm import tqdm
+
+
+def get_data_robust(pfiles):
+    with tqdm(total=len(pfiles), desc="Reading", unit="file") as pbar:
+        for pfin in pfiles:
+            if pfin.stat().st_size == 0:
+                continue
+
+            with gzip.open(pfin, "rt", encoding="utf-8") as f:
+                while True:
+                    try:
+                        line = f.readline()
+                        if not line:
+                            break  # End of currently available content
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        # Handle partial or malformed JSON (incomplete writes)
+                        continue
+                    except EOFError:
+                        # Handle unexpected EOF in gzip
+                        break
+            pbar.update(1)
 
 
 def main(
@@ -13,6 +39,7 @@ def main(
     every: int | None = None,
     max_time: int | None = None,
     num_cpus: int | None = None,
+    robust: bool = False,
 ):
     """
     Uploads a given folder to the HF hub. The datatype is automatically inferred from the folder contents, e.g.
@@ -38,8 +65,16 @@ def main(
 
     start_time = time.time()
     while True:
-        print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
-        ds = load_dataset("json", data_files=f"{local_path}/*.jsonl.gz", split="train", num_proc=num_cpus)
+        if robust:
+            files = list(Path(local_path).rglob("*.jsonl.gz"))
+            has_files_with_contents = len(files) > 0 and any(f.stat().st_size > 0 for f in files)
+            if has_files_with_contents:
+                ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
+            else:
+                raise DatasetGenerationError("No files found or all files are empty")
+        else:
+            print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
+            ds = load_dataset("json", data_files=f"{local_path}/*.jsonl.gz", split="train", num_proc=num_cpus)
 
         print(
             f"Uploading folder {local_path} to {hf_repo}"
@@ -83,6 +118,12 @@ if __name__ == "__main__":
     )
     cparser.add_argument("--max_time", type=int, help="Maximum time to run in minutes", default=None)
     cparser.add_argument("--num_cpus", type=int, help="Number of CPUs to use", default=None)
+    cparser.add_argument(
+        "--robust",
+        action="store_true",
+        help="Robustly read JSONL files, dropping incomplete lines (useful if process still running)",
+        default=False,
+    )
 
     cli_kwargs = vars(cparser.parse_args())
     main(**cli_kwargs)
