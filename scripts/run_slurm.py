@@ -5,7 +5,7 @@ import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
 from gpt_nl_copyright.script_utils import SlurmConfig, build_pipeline
-from gpt_nl_copyright.utils import print_system_stats
+from gpt_nl_copyright.utils import PROJECT_ROOT, print_system_stats
 
 
 def job_id_retriever(job_id: str) -> str:
@@ -32,13 +32,15 @@ def main(
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,
     )
+    log_dir = str(PROJECT_ROOT / "logs" / dump)
+    slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / dump)
     main_processing_executor = SlurmPipelineExecutor(
         pipeline=pipeline,
         job_id_retriever=job_id_retriever,
         tasks=cfg.tasks,
         time=cfg.time,
-        logging_dir=f"{output_path}/logs/",
-        slurm_logs_folder=f"{output_path}/slurm-logs/",
+        logging_dir=log_dir,
+        slurm_logs_folder=slurm_log_dir,
         randomize_start_duration=cfg.randomize_start_duration,
         mem_per_cpu_gb=cfg.mem_per_cpu_gb,
         partition=partition,
