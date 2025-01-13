@@ -4,9 +4,12 @@ import os
 import time
 from pathlib import Path
 
-from datasets import Dataset, load_dataset
-from datasets.exceptions import DatasetGenerationError
+from datasets import Dataset, disable_caching, load_dataset
+from huggingface_hub import create_repo
 from tqdm import tqdm
+
+
+disable_caching()
 
 
 def get_data_robust(pfiles):
@@ -48,10 +51,10 @@ def main(
     max_time: int | None = None,
     num_cpus: int | None = None,
     robust: bool = False,
+    include_text: bool = False,
 ):
     """
-    Uploads a given folder to the HF hub. The datatype is automatically inferred from the folder contents, e.g.
-    .json or .jsonl.gz files.
+    Uploads a dataset of JSONL GZ files to the HF hub.
 
     :param local_path: The local path to the folder to upload
     :param hf_repo: The HF repo name
@@ -59,12 +62,13 @@ def main(
     :param max_shard_size: The maximum shard size
     :param public: Whether the repo should be public
     :param every: Upload every x minutes
-    :param max_time: Maximum time to run in minutes
+    :param max_time: Maximum time to run in minutes. If 'every' is given and 'max_time'
+    is not given, the script will run indefinitely
     :param num_cpus: Number of CPUs to use -- only used if robust is not set
     :param robust: Whether to read the JSONL files robustly, dropping incomplete lines
     """
-    if every and not max_time:
-        raise ValueError("If 'every' is set, 'max_time' must be set as well")
+    create_repo(repo_id=hf_repo, repo_type="dataset", private=not public, exist_ok=True)
+
     if max_time and not every:
         raise ValueError("If 'max_time' is set, 'every' must be set as well")
 
@@ -75,38 +79,38 @@ def main(
 
     start_time = time.time()
     while True:
-        if robust:
-            files = list(Path(local_path).rglob("*.jsonl.gz"))
-            if len(files) > 0:
-                has_files_with_contents = any(f.stat().st_size > 0 for f in files)
-                if has_files_with_contents:
-                    ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
-                else:
-                    raise DatasetGenerationError("All files are empty")
+        files = list(Path(local_path).rglob("*.jsonl.gz"))
+        # Filter empty files
+        files = [f for f in files if f.stat().st_size > 0]
+        if files:
+            if robust:
+                ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
             else:
-                raise DatasetGenerationError(f"No files found in {local_path}")
-        else:
-            print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
-            ds = load_dataset("json", data_files=f"{local_path}/*.jsonl.gz", split="train", num_proc=num_cpus)
+                print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
+                ds = load_dataset("json", data_files=f"{local_path}/*.jsonl.gz", split="train", num_proc=num_cpus)
 
-        print(
-            f"Uploading folder {local_path} to {hf_repo}"
-            f" in remote folder {config_name.replace('--', '/')}"
-            f" (config: {config_name}; public: {public})"
-        )
-        ds.push_to_hub(
-            repo_id=hf_repo,
-            config_name=config_name if config_name else "default",
-            data_dir=config_name.replace("--", "/") if config_name else None,
-            max_shard_size=max_shard_size,
-            private=not public,
-            commit_message=f"Upload to {hf_repo} with config {config_name} and max_shard_size {max_shard_size}",
-        )
-        ds.cleanup_cache_files()
+            if not include_text:
+                ds = ds.remove_columns("text")
+
+            print(
+                f"Uploading folder {local_path} to {hf_repo}"
+                f" in remote folder {config_name.replace('--', '/')}"
+                f" (config: {config_name}; public: {public})"
+            )
+            ds.push_to_hub(
+                repo_id=hf_repo,
+                config_name=config_name if config_name else "default",
+                data_dir=config_name.replace("--", "/") if config_name else None,
+                max_shard_size=max_shard_size,
+                private=not public,
+                commit_message=f"Upload to {hf_repo} with config {config_name} and max_shard_size {max_shard_size}",
+            )
+            ds.cleanup_cache_files()
 
         if every:
             time.sleep(every * 60)
-            if time.time() - start_time > max_time * 60:
+            # If max_time is not given, we will run indefinitely
+            if max_time and time.time() - start_time > max_time * 60:
                 break
         else:
             break
@@ -135,6 +139,12 @@ if __name__ == "__main__":
         "--robust",
         action="store_true",
         help="Robustly read JSONL files, dropping incomplete lines (useful if process still running)",
+        default=False,
+    )
+    cparser.add_argument(
+        "--include_text",
+        action="store_true",
+        help="Include the 'text' column in the dataset",
         default=False,
     )
 

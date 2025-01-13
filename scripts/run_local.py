@@ -4,6 +4,7 @@ import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
 from gpt_nl_copyright.script_utils import LocalConfig, build_pipeline
+from gpt_nl_copyright.utils import PROJECT_ROOT
 
 
 def main(
@@ -24,11 +25,12 @@ def main(
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,
     )
+    log_dir = str(PROJECT_ROOT / "logs" / dump)
     main_processing_executor = LocalPipelineExecutor(
         pipeline=pipeline,
         tasks=cfg.tasks,
         workers=cfg.workers,
-        logging_dir=f"{output_path}/logs/",
+        logging_dir=log_dir,
         randomize_start_duration=cfg.randomize_start_duration,
     )
     main_processing_executor.run()
