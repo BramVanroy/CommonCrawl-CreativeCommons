@@ -12,6 +12,7 @@ def main(
     public: bool = False,
     every: int | None = None,
     max_time: int | None = None,
+    num_cpus: int | None = None,
 ):
     """
     Uploads a given folder to the HF hub. The datatype is automatically inferred from the folder contents, e.g.
@@ -30,7 +31,10 @@ def main(
     if max_time and not every:
         raise ValueError("If 'max_time' is set, 'every' must be set as well")
 
-    num_cpus = max(os.cpu_count() - 1, 1)
+    if num_cpus is not None and num_cpus < 1:
+        raise ValueError("num_cpus must be at least 1")
+
+    num_cpus = num_cpus or max(os.cpu_count() - 1, 1)
 
     start_time = time.time()
     while True:
@@ -78,6 +82,7 @@ if __name__ == "__main__":
         "--every", type=int, help="Upload every x minutes. Requires 'max_time' to be set", default=None
     )
     cparser.add_argument("--max_time", type=int, help="Maximum time to run in minutes", default=None)
+    cparser.add_argument("--num_cpus", type=int, help="Number of CPUs to use", default=None)
 
     cli_kwargs = vars(cparser.parse_args())
     main(**cli_kwargs)
