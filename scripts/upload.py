@@ -4,7 +4,8 @@ import os
 import time
 from pathlib import Path
 
-from datasets import Dataset, DatasetGenerationError, load_dataset
+from datasets import Dataset, load_dataset
+from datasets.exceptions import DatasetGenerationError
 from tqdm import tqdm
 
 
