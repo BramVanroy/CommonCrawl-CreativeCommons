@@ -1,6 +1,7 @@
 configs/
 output/
 logs/
+slurm-logs/
 scratches/
 tmp/
 
