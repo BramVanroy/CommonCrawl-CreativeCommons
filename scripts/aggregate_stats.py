@@ -32,6 +32,10 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
                         language = item.split("/")[0]
                         stats["writer"][language] += value
 
+    for comp_name, counter in stats["filter"].items():
+        percent_dropped = counter["num_dropped_docs"] / counter["num_input_docs"]
+        stats["filter"][comp_name]["percent_dropped_docs"] = f"{percent_dropped:.2%}"
+
     # Convert defaultdicts and counters to dicts
     stats["filter"] = dict(stats["filter"])
     stats["filter"] = {comp_name: dict(counter) for comp_name, counter in stats["filter"].items()}
