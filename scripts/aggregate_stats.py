@@ -10,7 +10,7 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
     dump = pdir.parent.stem
     pfout = pdir.parent / f"{dump}_agg_stats.json"
 
-    stats = {"filter": defaultdict(Counter), "writer": Counter}
+    stats = {"filter": defaultdict(Counter), "writer": Counter()}
     for pfin in pdir.rglob("*.json"):
         data = json.loads(pfin.read_text(encoding="utf-8"))
         for component in data:
