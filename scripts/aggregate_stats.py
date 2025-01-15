@@ -23,7 +23,8 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
             if comp_type == "filter" and comp_name != "Url-filter":
                 stats["filter"][comp_name]["num_input_docs"] += component["stats"]["total"]
                 stats["filter"][comp_name]["num_output_docs"] += component["stats"]["forwarded"]
-                stats["filter"][comp_name]["num_dropped_docs"] += component["stats"]["dropped"]
+                if "dropped" in component["stats"]:
+                    stats["filter"][comp_name]["num_dropped_docs"] += component["stats"]["dropped"]
             elif comp_type == "writer":
                 for item, value in component["stats"].items():
                     if item.endswith(".jsonl.gz"):
