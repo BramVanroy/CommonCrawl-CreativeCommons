@@ -15,7 +15,7 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
         data = json.loads(pfin.read_text(encoding="utf-8"))
         for comp_idx, component in enumerate(data):
             # Remove emojis and such
-            full_name = re.sub(r"[\W_]+", "", component["name"])
+            full_name = re.sub(r"[^\w\-:]+", "", component["name"])
             full_name = full_name.split("-", 1)[1]
             comp_type, comp_name = full_name.split(":", 1)
             comp_type = comp_type.strip().lower()
