@@ -10,7 +10,7 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
     dump = pdir.parent.stem
     pfout = pdir.parent / f"{dump}_agg_stats.json"
 
-    stats = {"filter": defaultdict(Counter), "writer": defaultdict(Counter)}
+    stats = {"filter": defaultdict(Counter), "writer": Counter}
     for pfin in pdir.rglob("*.json"):
         data = json.loads(pfin.read_text(encoding="utf-8"))
         for component in data:
@@ -32,10 +32,9 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
                         stats["writer"][language] += value
 
     # Convert defaultdicts and counters to dicts
-    for key in stats:
-        stats[key] = dict(stats[key])
-        for subkey in stats[key]:
-            stats[key][subkey] = dict(stats[key][subkey])
+    stats["filter"] = dict(stats["filter"])
+    stats["filter"] = {comp_name: dict(counter) for comp_name, counter in stats["filter"].items()}
+    stats["writer"] = dict(stats["writer"])
 
     stats = {"dump": dump, **stats}
     with pfout.open("w", encoding="utf-8") as fhout:
