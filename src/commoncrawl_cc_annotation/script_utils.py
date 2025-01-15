@@ -8,9 +8,9 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
-from gpt_nl_copyright.components.annotator.license_annotator import LicenseAnnotator
-from gpt_nl_copyright.components.filters.empty_text_filter import EmptyTextFilter
-from gpt_nl_copyright.components.filters.license_filter import LicenseFilter
+from commoncrawl_cc_annotation.components.annotators.license_annotator import LicenseAnnotator
+from commoncrawl_cc_annotation.components.filters.empty_text_filter import EmptyTextFilter
+from commoncrawl_cc_annotation.components.filters.license_filter import LicenseFilter
 
 
 # Dutch, Frisian, English, Spanish, French, Italian, German, Afrikaans
@@ -27,6 +27,8 @@ LANGUAGES = [
 
 
 class _BaseConfig(BaseModel):
+    """Base Config class for local and Slurm configurations"""
+
     tasks: int = 1
     randomize_start_duration: int = 0
     language_threshold: float = 0.65
@@ -36,10 +38,14 @@ class _BaseConfig(BaseModel):
 
 
 class LocalConfig(_BaseConfig):
+    """Local configuration for running the pipeline on a local machine"""
+
     workers: int = -1
 
 
 class SlurmConfig(_BaseConfig):
+    """Slurm configuration for running the pipeline on a cluster"""
+
     time: str
     mem_per_cpu_gb: int = 2
     cpus_per_task: int = 1
@@ -48,6 +54,20 @@ class SlurmConfig(_BaseConfig):
 def build_pipeline(
     dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65, limit: int = -1
 ) -> list[PipelineStep]:
+    """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
+    function so that it can be used in both the local and Slurm scripts.
+
+    Args:
+        dump (str): Common Crawl dump to process
+        output_path (str): Main output path. JSONL.GZ files will be saved in subfolders based on language
+        languages (list[str]): List of languages to filter for
+        language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
+        limit (int, optional): Maximum number of pages to process per task, useful for debugging.
+        -1 = no limit. Defaults to -1.
+
+    Returns:
+        list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
+    """
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -68,3 +88,7 @@ def build_pipeline(
             expand_metadata=True,
         ),
     ]
+
+
+if __name__ == "__main__":
+    _BaseConfig()

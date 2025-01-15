@@ -3,7 +3,7 @@ from datatrove.pipeline.filters.base_filter import BaseFilter
 
 
 class EmptyTextFilter(BaseFilter):
-    """Filter out documents that have no text"""
+    """Filter out documents that have no text, i.e. empty stripped text property"""
 
     name = "🗅 Empty Text Filter"
 

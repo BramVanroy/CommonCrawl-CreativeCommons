@@ -71,7 +71,7 @@ for SUBDIR in "$DIR_PATH"/*/; do
         LANGUAGE=$(basename "$SUBDIR")
         
         # Execute the Python script with the required arguments
-        echo "Executing: python \"$CURR_DIR/upload.py\" \"$SUBDIR\" -c \"$DUMP--$LANGUAGE\" --every $EVERY"
+        echo "Executing: python \"$CURR_DIR/upload.py\" --local_path \"$SUBDIR\" --config_name \"$DUMP--$LANGUAGE\" --hf_repo BramVanroy/CommonCrawl-CreativeCommons --robust --every $EVERY --include_text"
         python "$CURR_DIR/upload.py" --local_path "$SUBDIR" --config_name "$DUMP--$LANGUAGE" --hf_repo BramVanroy/CommonCrawl-CreativeCommons --robust --every "$EVERY" --include_text &
         # Sleep to avoid race-conditions when creating the repository
         sleep 30

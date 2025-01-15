@@ -3,7 +3,7 @@ requires = ["setuptools >= 64", "setuptools_scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gpt_nl_copyright"
+name = "commoncrawl_cc_annotation"
 dynamic = ["version"]
 authors = [
     {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
@@ -13,7 +13,7 @@ maintainers = [
 ]
 description = "Automated data quality annotation"
 readme = "README.md"
-keywords = ["data creation", "copyrighted data", "data annotation"]
+keywords = ["data creation", "copyrighted data", "data annotation", "common crawl"]
 license = {file = "LICENSE"}
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -48,10 +48,10 @@ dev = [
 ]
 
 [project.urls]
-homepage = "https://github.com/gpt-nl-copyright"
-documentation = "https://github.com/gpt-nl-copyright"
-issues = "https://github.com/gpt-nl-copyright/issues"
-repository = "https://github.com/gpt-nl-copyright.git"
+homepage = "https://github.com/BramVanroy/CommonCrawl-CreativeCommons"
+documentation = "https://github.com/BramVanroy/CommonCrawl-CreativeCommons"
+issues = "https://github.com/BramVanroy/CommonCrawl-CreativeCommons/issues"
+repository = "https://github.com/BramVanroy/CommonCrawl-CreativeCommons.git"
 
 
 [project.scripts]
@@ -65,7 +65,7 @@ license-files = ['LICEN[CS]E*']
 where = ["src"]
 
 [tool.setuptools_scm]
-version_file = "src/gpt_nl_copyright/version.py"
+version_file = "src/commoncrawl_cc_annotation/version.py"
 
 [tool.ruff]
 line-length = 119
@@ -80,7 +80,7 @@ select = ["C", "E", "F", "W", "I"]
 
 [tool.ruff.lint.isort]
 lines-after-imports = 2
-known-first-party = ["gpt_nl_copyright"]
+known-first-party = ["commoncrawl_cc_annotation"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

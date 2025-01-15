@@ -4,8 +4,8 @@ from pathlib import Path
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
-from gpt_nl_copyright.script_utils import SlurmConfig, build_pipeline
-from gpt_nl_copyright.utils import PROJECT_ROOT, print_system_stats
+from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_pipeline
+from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
 
 
 def job_id_retriever(job_id: str) -> str:

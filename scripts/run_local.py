@@ -3,8 +3,8 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from gpt_nl_copyright.script_utils import LocalConfig, build_pipeline
-from gpt_nl_copyright.utils import PROJECT_ROOT
+from commoncrawl_cc_annotation.script_utils import LocalConfig, build_pipeline
+from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
 def main(

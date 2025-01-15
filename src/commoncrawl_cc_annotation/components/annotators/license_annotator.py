@@ -6,7 +6,7 @@ from urllib.parse import unquote
 
 from datatrove.data import Document
 
-from gpt_nl_copyright.components.annotator.base import BaseAnnotator
+from commoncrawl_cc_annotation.components.annotators.base import BaseAnnotator
 
 
 class LicenseAnnotator(BaseAnnotator):

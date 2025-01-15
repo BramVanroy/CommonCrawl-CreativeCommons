@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 
+# Root directory of this library
 PROJECT_ROOT = Path(__file__).parents[2]
 
 

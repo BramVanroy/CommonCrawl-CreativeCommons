@@ -5,7 +5,7 @@ slurm-logs/
 scratches/
 tmp/
 
-src/gpt_nl_copyright/version.py
+src/commoncrawl_cc_annotation/version.py
 
 uv.lock
 .ruff_cache

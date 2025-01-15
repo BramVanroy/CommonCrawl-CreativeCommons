@@ -1,7 +1,7 @@
 quality:
-	ruff check src/gpt_nl_copyright scripts/
-	ruff format --check src/gpt_nl_copyright scripts/
+	ruff check src/commoncrawl_cc_annotation scripts/
+	ruff format --check src/commoncrawl_cc_annotation scripts/
 
 style:
-	ruff check src/gpt_nl_copyright scripts/ --fix
-	ruff format src/gpt_nl_copyright scripts/
+	ruff check src/commoncrawl_cc_annotation scripts/ --fix
+	ruff format src/commoncrawl_cc_annotation scripts/

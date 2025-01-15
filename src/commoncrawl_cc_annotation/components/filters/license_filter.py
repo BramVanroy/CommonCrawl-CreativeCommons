@@ -3,9 +3,9 @@ from datatrove.pipeline.filters.base_filter import BaseFilter
 
 
 class LicenseFilter(BaseFilter):
-    """Filter out documents that do not contain CreativeCommons copyright information"""
+    """Filter out documents that do not contain CreativeCommons license information"""
 
-    name = "🛡️ Copyright Filter"
+    name = "🛡️ License Filter"
 
     def __init__(self):
         super().__init__()
