@@ -5,7 +5,7 @@ from os import PathLike
 from pathlib import Path
 
 
-def aggregate(pdir: str | PathLike) -> None:
+def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
     pdir = Path(pdir)
     dump = pdir.parent.stem
     pfout = pdir.parent / f"{dump}_agg_stats.json"
@@ -40,6 +40,9 @@ def aggregate(pdir: str | PathLike) -> None:
     with pfout.open("w", encoding="utf-8") as fhout:
         json.dump(stats, fhout, indent=4)
 
+    if verbose:
+        print(json.dumps(stats, indent=4))
+
 
 if __name__ == "__main__":
     import argparse
@@ -51,10 +54,15 @@ if __name__ == "__main__":
     cparser.add_argument(
         "pdir",
         type=str,
-        required=True,
         help="Path to the directory containing the pipeline stats, typically ending in '<dump_name>/stats'."
         " This directory's parent will be used as the dump name. Outputs will be written to this parent"
         " directory as 'agg_stats.json'.",
     )
+    cparser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print the aggregated statistics to stdout.",
+    )
     cargs = cparser.parse_args()
-    aggregate(cargs.pdir)
+    aggregate(cargs.pdir, cargs.verbose)
