@@ -3,7 +3,7 @@ import re
 from collections import Counter, defaultdict
 from os import PathLike
 from pathlib import Path
-
+from tqdm import tqdm
 
 def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
     pdir = Path(pdir)
@@ -11,14 +11,16 @@ def aggregate(pdir: str | PathLike, verbose: bool = False) -> None:
     pfout = pdir.parent / f"{dump}_agg_stats.json"
 
     stats = {"filter": defaultdict(Counter), "writer": Counter()}
-    for pfin in pdir.rglob("*.json"):
+    for pfin in tqdm(list(pdir.rglob("*.json")), unit="file"):
         data = json.loads(pfin.read_text(encoding="utf-8"))
-        for component in data:
-            full_name = re.sub(r"[\ud800-\udfff\ufe0f]", "", component["name"])
+        for comp_idx, component in enumerate(data):
+            # Remove emojis and such
+            full_name = re.sub(r"[\W_]+", "", component["name"])
             full_name = full_name.split("-", 1)[1]
             comp_type, comp_name = full_name.split(":", 1)
             comp_type = comp_type.strip().lower()
             comp_name = comp_name.strip()
+            comp_name = f"{comp_name} (#{comp_idx})"
 
             if comp_type == "filter" and comp_name != "Url-filter":
                 stats["filter"][comp_name]["num_input_docs"] += component["stats"]["total"]
