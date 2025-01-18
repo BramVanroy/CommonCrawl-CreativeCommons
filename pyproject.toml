@@ -30,14 +30,6 @@ classifiers = [
 
 requires-python = ">=3.10"
 dependencies = [
-    "datasets",
-    "hf_transfer",
-    "huggingface_hub",
-    "pip",
-]
-
-[project.optional-dependencies]
-dependencies = [
     "beautifulsoup4",
     "datasets",
     "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/BramVanroy/datatrove",
@@ -47,9 +39,10 @@ dependencies = [
     "lxml",
     "lxml_html_clean",
     "pip",
-    "pydantic",
+    "pydantic"
 ]
 
+[project.optional-dependencies]
 dev = [
     "pytest",
     "ruff"
@@ -67,7 +60,7 @@ repository = "https://github.com/BramVanroy/CommonCrawl-CreativeCommons.git"
 # TOOLS
 [tool.setuptools]
 include-package-data = true
-license-files = ['LICEN[CS]E*']
+license-files = ["LICEN[CS]E*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
