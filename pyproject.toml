@@ -30,6 +30,14 @@ classifiers = [
 
 requires-python = ">=3.10"
 dependencies = [
+    "datasets",
+    "hf_transfer",
+    "huggingface_hub",
+    "pip",
+]
+
+[project.optional-dependencies]
+dependencies = [
     "beautifulsoup4",
     "datasets",
     "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/BramVanroy/datatrove",
@@ -42,7 +50,6 @@ dependencies = [
     "pydantic",
 ]
 
-[project.optional-dependencies]
 dev = [
     "pytest",
     "ruff"

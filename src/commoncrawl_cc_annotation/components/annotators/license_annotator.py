@@ -6,7 +6,7 @@ from urllib.parse import unquote
 
 from datatrove.data import Document
 
-from commoncrawl_cc_annotation.components.annotators.base import BaseAnnotator
+from .base import BaseAnnotator
 
 
 class LicenseAnnotator(BaseAnnotator):
@@ -80,6 +80,7 @@ location_preference_order = ["meta_tag", "json-ld", "link_tag", "a_tag"]
 head_preference_order = [True, False]
 footer_preference_order = [True, False]
 license_tuple_keys = ("abbr", "version", "location", "in_head", "in_footer")
+
 
 def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None]:
     """Given a URL that might be from creativecommons.org, try to parse out the license type and version.
@@ -210,7 +211,6 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
                             parse_content_license(license_url, "json-ld", script_tag)
                     elif isinstance(license_val, str):
                         parse_content_license(license_val, "json-ld", script_tag)
-
 
     return sort_licenses(results)
 

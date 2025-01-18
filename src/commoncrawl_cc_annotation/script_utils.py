@@ -8,9 +8,8 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
-from commoncrawl_cc_annotation.components.annotators.license_annotator import LicenseAnnotator
-from commoncrawl_cc_annotation.components.filters.empty_text_filter import EmptyTextFilter
-from commoncrawl_cc_annotation.components.filters.license_filter import LicenseFilter
+from .components.annotators import LicenseAnnotator
+from .components.filters import EmptyTextFilter, LicenseFilter
 
 
 # Dutch, Frisian, English, Spanish, French, Italian, German, Afrikaans
@@ -88,7 +87,3 @@ def build_pipeline(
             expand_metadata=True,
         ),
     ]
-
-
-if __name__ == "__main__":
-    _BaseConfig()
