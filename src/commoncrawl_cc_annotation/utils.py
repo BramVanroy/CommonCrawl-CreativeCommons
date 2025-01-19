@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import os
 from pathlib import Path
 
@@ -16,3 +18,8 @@ def print_system_stats():
         print(f"Available memory: {os.popen('free -h').read()}")
     except Exception:
         pass
+
+
+def generate_base64_hash(input_string: str) -> str:
+    sha256_hash = hashlib.sha256(input_string.encode()).digest()
+    return base64.urlsafe_b64encode(sha256_hash).decode("utf-8")
