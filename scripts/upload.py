@@ -96,6 +96,10 @@ def main(
     start_time = time.time()
     while True:
         lang2files = find_language_dirs(local_path)
+
+        if not lang2files:
+            print("No non-empty files found.")
+
         for lang, files in lang2files.items():
             if files:
                 if robust:
