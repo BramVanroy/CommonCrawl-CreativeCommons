@@ -5,6 +5,9 @@ slurm-logs/
 scratches/
 tmp/
 
+downloaded_warc_file.warc.gz
+extracted.html
+
 src/commoncrawl_cc_annotation/version.py
 
 uv.lock
