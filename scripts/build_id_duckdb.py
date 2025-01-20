@@ -1,8 +1,12 @@
 import os
+import re
 from concurrent.futures import ProcessPoolExecutor
 
 import duckdb
 from datasets import Dataset, DatasetDict, IterableDatasetDict, concatenate_datasets, load_dataset
+
+
+uuid_re = re.compile(r"<urn:uuid:([a-zA-Z0-9]{8}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{12})>")
 
 
 def dataset_to_parquet(
@@ -17,7 +21,7 @@ def dataset_to_parquet(
 ) -> str:
     """
     Load a HuggingFace dataset and save one of its columns as a parquet file so that we can use it for
-    querying other samples against it.
+    querying other samples against it. The assumption is that the default `id` column is the WARC-Record-ID.
 
     Args:
         dataset_name: The name of the dataset
@@ -51,11 +55,11 @@ def dataset_to_parquet(
 
     # "<urn:uuid:6a8657b3-84d0-45df-b4b2-5fb6eef55ee5>" -> "6a8657b3-84d0-45df-b4b2-5fb6eef55ee5"
     # = compatible with duckdb UUID type
-    if unique_column == "id":
+    if unique_column == "id" and "fineweb" in dataset_name.lower():
         if not streaming:
-            ds = ds.map(lambda idx: {"id": idx["id"][10:-1]}, input_columns="id", num_proc=num_workers)
+            ds = ds.map(lambda idx: {"id": uuid_re.sub("\\1", idx)}, input_columns="id", num_proc=num_workers)
         else:
-            ds = ds.map(lambda idx: {"id": idx[10:-1]}, input_columns="id")
+            ds = ds.map(lambda idx: {"id": uuid_re.sub("\\1", idx)}, input_columns="id")
 
     if streaming:
 
@@ -117,7 +121,7 @@ def parquet_to_duckdb(
 if __name__ == "__main__":
     langs = ["nld_Latn", "fra_Latn", "deu_Latn", "spa_Latn", "ita_Latn", "fry_Latn", "afr_Latn"]
 
-    def process_lang(lang):
+    def process_lang_fw2(dataset_name, lang):
         dataset_name = "HuggingFaceFW/fineweb-2"
         parquet_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw2-{lang}.parquet"
         duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw2-{lang}.duckdb"
@@ -129,4 +133,4 @@ if __name__ == "__main__":
             duckdb_path = parquet_to_duckdb(parquet_path, duckdb_path, overwrite=False)
 
     with ProcessPoolExecutor(max_workers=len(langs)) as p:
-        p.map(process_lang, langs)
+        p.map(process_lang_fw2, langs)
