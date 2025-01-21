@@ -2,6 +2,8 @@ import gzip
 import json
 import os
 import time
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 
 from datasets import Dataset, disable_caching, load_dataset
@@ -58,6 +60,48 @@ def find_language_dirs(local_path: str) -> dict[str, list[Path]]:
     return lang2files
 
 
+def process_language_files(
+    lang: str,
+    files: list[Path],
+    hf_repo: str,
+    max_shard_size: str,
+    public: bool,
+    robust: bool,
+    include_text: bool,
+    num_cpus: int,
+):
+    """
+    Given a language and a list of files, this function uploads the data to the HF hub.
+
+    :param lang: The language
+    :param files: The list of files
+    :param hf_repo: The HF repo name
+    :param max_shard_size: The maximum shard size
+    :param public: Whether the repo should be public
+    :param robust: Whether to read the JSONL files robustly, dropping incomplete lines
+    :param include_text: Whether to include the 'text' column in the dataset
+    :param num_cpus: Number of CPUs to use -- only used if robust is not set
+    """
+    if files:
+        if robust:
+            ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
+        else:
+            ds = load_dataset("json", data_files=[str(pf) for pf in files], split="train", num_proc=num_cpus)
+
+        if not include_text:
+            ds = ds.remove_columns("text")
+
+        print(f"Uploading language {lang} to {hf_repo} in remote folder {lang} (config: {lang}; public: {public})")
+        ds.push_to_hub(
+            repo_id=hf_repo,
+            config_name=lang,
+            data_dir=lang,
+            max_shard_size=max_shard_size,
+            private=not public,
+        )
+        ds.cleanup_cache_files()
+
+
 def main(
     local_path: str,
     hf_repo: str,
@@ -66,6 +110,7 @@ def main(
     every: int | None = None,
     max_time: int | None = None,
     num_cpus: int | None = None,
+    max_parallel_uploads: int = 8,
     robust: bool = False,
     include_text: bool = False,
 ):
@@ -93,37 +138,25 @@ def main(
 
     num_cpus = num_cpus or max(os.cpu_count() - 1, 1)
 
+    single_proc_fn = partial(
+        process_language_files,
+        hf_repo=hf_repo,
+        max_shard_size=max_shard_size,
+        public=public,
+        robust=robust,
+        include_text=include_text,
+        num_cpus=num_cpus,
+    )
     start_time = time.time()
     while True:
         lang2files = find_language_dirs(local_path)
 
         if not lang2files:
             print("No non-empty files found.")
-
-        for lang, files in lang2files.items():
-            if files:
-                if robust:
-                    ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
-                else:
-                    print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
-                    ds = load_dataset("json", data_files=[str(pf) for pf in files], split="train", num_proc=num_cpus)
-
-                if not include_text:
-                    ds = ds.remove_columns("text")
-
-                print(
-                    f"Uploading folder {local_path} to {hf_repo}"
-                    f" in remote folder {lang}"
-                    f" (config: {lang}; public: {public})"
-                )
-                ds.push_to_hub(
-                    repo_id=hf_repo,
-                    config_name=lang,
-                    data_dir=lang,
-                    max_shard_size=max_shard_size,
-                    private=not public,
-                )
-                ds.cleanup_cache_files()
+        else:
+            pool_size = min(max_parallel_uploads, len(lang2files))
+            with ProcessPoolExecutor(max_workers=pool_size) as executor:
+                executor.map(single_proc_fn, lang2files.keys(), lang2files.values())
 
         if every:
             time.sleep(every * 60)
