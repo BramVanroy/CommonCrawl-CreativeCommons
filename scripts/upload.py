@@ -182,7 +182,8 @@ if __name__ == "__main__":
         "--every", type=int, help="Upload every x minutes. Requires 'max_time' to be set", default=None
     )
     cparser.add_argument("--max_time", type=int, help="Maximum time to run in minutes", default=None)
-    cparser.add_argument("--num_cpus", type=int, help="Number of CPUs to use", default=None)
+    cparser.add_argument("--num_cpus", type=int, help="Number of CPUs to use for reading a dataset", default=None)
+    cparser.add_argument("--max_parallel_uploads", type=int, help="Maximum parallel uploads", default=8)
     cparser.add_argument(
         "--robust",
         action="store_true",
