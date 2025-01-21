@@ -100,7 +100,10 @@ def process_language_files(
             private=not public,
         )
         ds.cleanup_cache_files()
-
+        del ds
+        print(f"Finished uploading language {lang} to {hf_repo} in remote folder {lang} (config: {lang}; public: {public})")
+    
+    print(f"Nothing to do for language {lang}")
 
 def main(
     local_path: str,
