@@ -12,7 +12,7 @@ from tqdm import tqdm
 disable_caching()
 
 
-def get_data_robust(pfiles):
+def get_data_robust(pfiles: list[Path]):
     """
     Given a set of .jsonl.gz files, this function reads them in a robust way, skipping incomplete lines,
     and yielding one sample at a time (parse-able JSON line).
@@ -41,7 +41,7 @@ def get_data_robust(pfiles):
             pbar.update(1)
 
 
-def find_language_dirs(local_path: str) -> dict[str, list[str]]:
+def find_language_dirs(local_path: str) -> dict[str, list[Path]]:
     """
     Given a local path, this function finds all subdirectories that do not have subdirectories
     and groups them by their stem (language).
@@ -53,7 +53,7 @@ def find_language_dirs(local_path: str) -> dict[str, list[str]]:
     plocal = Path(local_path).resolve()
     files = [pf.resolve() for pf in plocal.rglob("*.jsonl.gz") if pf.stat().st_size > 0]
     languages = {pf.parent.stem for pf in files}
-    lang2files = {lang: [str(pf) for pf in files if pf.parent.stem == lang] for lang in languages}
+    lang2files = {lang: [pf for pf in files if pf.parent.stem == lang] for lang in languages}
 
     return lang2files
 
@@ -106,7 +106,7 @@ def main(
                     ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
                 else:
                     print(f"Loading dataset from {local_path} with {num_cpus} CPUs")
-                    ds = load_dataset("json", data_files=files, split="train", num_proc=num_cpus)
+                    ds = load_dataset("json", data_files=[str(pf) for pf in files], split="train", num_proc=num_cpus)
 
                 if not include_text:
                     ds = ds.remove_columns("text")
