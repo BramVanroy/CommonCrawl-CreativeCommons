@@ -8,7 +8,7 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
-from .components.annotators import LicenseAnnotator
+from .components.annotators import LicenseAnnotator, HtmlCopier
 from .components.filters import EmptyTextFilter, LicenseFilter
 
 
@@ -51,7 +51,8 @@ class SlurmConfig(_BaseConfig):
 
 
 def build_pipeline(
-    dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65, limit: int = -1
+    dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65, limit: int = -1,
+    trafiltura_first: bool = False
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -63,27 +64,57 @@ def build_pipeline(
         language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
         -1 = no limit. Defaults to -1.
+        trafiltura_first (bool, optional): If True, the pipeline will first run the HTML copier, then
+        Trafilatura, and finally the license annotator. If False, the pipeline will run the license
+        annotator first. This was intended for benchmarking. The default (false) is about 10% faster.
+        Defaults to False.
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
-    return [
-        WarcReader(
-            f"s3://commoncrawl/crawl-data/{dump}/segments/",
-            glob_pattern="*/warc/*",
-            default_metadata={"dump": dump},
-            limit=limit,
-        ),
-        URLFilter(),
-        EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
-        LicenseAnnotator(),
-        LicenseFilter(),
-        Trafilatura(favour_precision=True, timeout=600.0),
-        LanguageFilter(languages=languages, language_threshold=language_threshold),
-        EmptyTextFilter(),  # filter items with empty extracted text
-        JsonlWriter(
-            output_folder=f"{output_path}/",
-            output_filename="${language}/${rank}.jsonl.gz",
-            expand_metadata=True,
-        ),
-    ]
+    if trafiltura_first:
+        return [
+            WarcReader(
+                f"s3://commoncrawl/crawl-data/{dump}/segments/",
+                glob_pattern="*/warc/*",
+                default_metadata={"dump": dump},
+                limit=limit,
+            ),
+            URLFilter(),
+            EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
+            HtmlCopier(),
+            Trafilatura(favour_precision=True, timeout=600.0),
+            EmptyTextFilter(),  # filter items with empty extracted text
+            LanguageFilter(languages=languages, language_threshold=language_threshold),
+            LicenseAnnotator(
+                html_in_metadata=True,
+                remove_html=True,
+            ),
+            LicenseFilter(),
+            JsonlWriter(
+                output_folder=f"{output_path}/",
+                output_filename="${language}/${rank}.jsonl.gz",
+                expand_metadata=True,
+            ),
+        ]
+    else:
+        return [
+            WarcReader(
+                f"s3://commoncrawl/crawl-data/{dump}/segments/",
+                glob_pattern="*/warc/*",
+                default_metadata={"dump": dump},
+                limit=limit,
+            ),
+            URLFilter(),
+            EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)            
+            LicenseAnnotator(),
+            LicenseFilter(),
+            Trafilatura(favour_precision=True, timeout=600.0),
+            EmptyTextFilter(),  # filter items with empty extracted text
+            LanguageFilter(languages=languages, language_threshold=language_threshold),
+            JsonlWriter(
+                output_folder=f"{output_path}/",
+                output_filename="${language}/${rank}.jsonl.gz",
+                expand_metadata=True,
+            ),
+        ]

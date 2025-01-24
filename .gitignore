@@ -4,6 +4,7 @@ logs/
 slurm-logs/
 scratches/
 tmp/
+duckdbs/
 
 downloaded_warc_file.warc.gz
 extracted.html

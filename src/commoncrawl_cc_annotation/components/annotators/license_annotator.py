@@ -14,8 +14,10 @@ class LicenseAnnotator(BaseAnnotator):
 
     _requires_dependencies = [("bs4", "beautifulsoup4")]
 
-    def __init__(self):
+    def __init__(self, html_in_metadata: bool = False, remove_html: bool = False):
         super().__init__()
+        self.html_in_metadata = html_in_metadata
+        self.remove_html = remove_html
 
     def annotate(self, doc: Document) -> Document:
         license_abbr = None
@@ -28,9 +30,14 @@ class LicenseAnnotator(BaseAnnotator):
         license_parse_error = None
         license_disagreement = None
 
+        if self.html_in_metadata:
+            html = doc.metadata["html"]
+        else:
+            html = doc.text
+            
         try:
             # List of tuples (license_abbr, license_version, location_found)
-            potential_licenses = find_cc_licenses_in_html(doc.text)
+            potential_licenses = find_cc_licenses_in_html(html)
         except Exception:
             license_parse_error = True
         else:
@@ -54,6 +61,9 @@ class LicenseAnnotator(BaseAnnotator):
         doc.metadata["potential_licenses"] = potential_licenses
         doc.metadata["license_parse_error"] = license_parse_error
         doc.metadata["license_disagreement"] = license_disagreement
+
+        if self.remove_html and self.html_in_metadata:
+            del doc.metadata["html"]
 
         return doc
 

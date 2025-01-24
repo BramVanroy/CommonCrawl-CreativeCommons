@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+import re
 from pathlib import Path
 
 
@@ -23,3 +24,10 @@ def print_system_stats():
 def generate_base64_hash(input_string: str) -> str:
     sha256_hash = hashlib.sha256(input_string.encode()).digest()
     return base64.urlsafe_b64encode(sha256_hash).decode("utf-8")
+
+
+uuid_re = re.compile(r"<urn:uuid:([a-zA-Z0-9]{8}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{12})>")
+
+
+def extract_uuid(uuid_urn: str) -> str:
+    return uuid_re.sub("\\1", uuid_urn).replace("-", "")
