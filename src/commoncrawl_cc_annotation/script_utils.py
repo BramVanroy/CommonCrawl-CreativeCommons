@@ -8,7 +8,7 @@ from datatrove.pipeline.readers import WarcReader
 from datatrove.pipeline.writers.jsonl import JsonlWriter
 from pydantic import BaseModel
 
-from .components.annotators import LicenseAnnotator, HtmlCopier
+from .components.annotators import HtmlCopier, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter
 
 
@@ -51,8 +51,12 @@ class SlurmConfig(_BaseConfig):
 
 
 def build_pipeline(
-    dump: str, output_path: str, languages: list[str], language_threshold: float = 0.65, limit: int = -1,
-    trafiltura_first: bool = False
+    dump: str,
+    output_path: str,
+    languages: list[str],
+    language_threshold: float = 0.65,
+    limit: int = -1,
+    trafiltura_first: bool = False,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -106,7 +110,7 @@ def build_pipeline(
                 limit=limit,
             ),
             URLFilter(),
-            EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)            
+            EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
             LicenseAnnotator(),
             LicenseFilter(),
             Trafilatura(favour_precision=True, timeout=600.0),

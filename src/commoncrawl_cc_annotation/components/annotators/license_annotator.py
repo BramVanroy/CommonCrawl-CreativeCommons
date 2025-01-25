@@ -34,7 +34,7 @@ class LicenseAnnotator(BaseAnnotator):
             html = doc.metadata["html"]
         else:
             html = doc.text
-            
+
         try:
             # List of tuples (license_abbr, license_version, location_found)
             potential_licenses = find_cc_licenses_in_html(html)
