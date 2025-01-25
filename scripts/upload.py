@@ -88,9 +88,9 @@ def process_language_files(
     """
     if files:
         if robust:
-            ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files})
+            ds = Dataset.from_generator(get_data_robust, cache_dir=None, gen_kwargs={"pfiles": files}, split="train")
         else:
-            ds = load_dataset("json", data_files=[str(pf) for pf in files], split="train", num_proc=num_cpus)
+            ds = load_dataset("json", data_files={"train": [str(pf) for pf in files]}, num_proc=num_cpus)
 
         if not include_text:
             ds = ds.remove_columns("text")
@@ -108,8 +108,8 @@ def process_language_files(
         print(
             f"Finished uploading language {lang} to {hf_repo} in remote folder {lang} (config: {lang}; public: {public})"
         )
-
-    print(f"Nothing to do for language {lang}")
+    else:
+        print(f"Nothing to do for language {lang}")
 
 
 def main(
