@@ -165,8 +165,12 @@ def main(
             print("No non-empty files found.")
         else:
             pool_size = min(max_parallel_uploads, len(lang2files))
-            with ProcessPoolExecutor(max_workers=pool_size) as executor:
-                executor.map(single_proc_fn, lang2files.keys(), lang2files.values())
+            if pool_size == 1:
+                for lang, files in lang2files.items():
+                    single_proc_fn(lang, files)
+            else:
+                with ProcessPoolExecutor(max_workers=pool_size) as executor:
+                    executor.map(single_proc_fn, lang2files.keys(), lang2files.values())
 
         if every:
             time.sleep(every * 60)
