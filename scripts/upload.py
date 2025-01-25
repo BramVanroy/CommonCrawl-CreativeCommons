@@ -22,16 +22,16 @@ def get_data_robust(pfiles: list[Path]):
     :param pfiles: A list of .jsonl.gz files
     :return: A generator yielding the contents of the files
     """
-    num_failures = 0
     with tqdm(total=len(pfiles), desc="Reading", unit="file") as pbar:
         for pfin in pfiles:
             if pfin.stat().st_size == 0:
                 continue
 
-            with gzip.open(pfin, "rt", encoding="utf-8") as f:
+            with gzip.open(pfin, "rt", encoding="utf-8") as fhin:
+                num_failures = 0
                 while True:
                     try:
-                        line = f.readline()
+                        line = fhin.readline()
                         if not line:
                             break  # End of currently available content
                         yield json.loads(line)
@@ -40,11 +40,11 @@ def get_data_robust(pfiles: list[Path]):
                         num_failures += 1
                     except EOFError:
                         # Handle unexpected EOF in gzip
+                        num_failures += 1
                         break
+                if num_failures:
+                    print(f"Skipped {num_failures:,} corrupt line(s) in {pfin}")
             pbar.update(1)
-    
-    if num_failures:
-        print(f"Skipped {num_failures:,} incomplete JSON lines")
 
 
 def find_language_dirs(local_path: str) -> dict[str, list[Path]]:
