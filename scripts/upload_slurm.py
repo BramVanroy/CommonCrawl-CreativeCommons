@@ -3,21 +3,8 @@ from pathlib import Path
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import LocalConfig, SlurmConfig, build_upload_pipeline, job_id_retriever
+from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_upload_pipeline, job_id_retriever
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def main(
@@ -55,7 +42,9 @@ def main(
         venv_path=venv_path,
         qos="",
         sbatch_args=sbatch_args,
+        job_name="upload",
     ).run()
+
 
 if __name__ == "__main__":
     import argparse
