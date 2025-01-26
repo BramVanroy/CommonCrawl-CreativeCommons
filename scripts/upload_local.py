@@ -3,13 +3,14 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import LocalConfig, build_pipeline
+from commoncrawl_cc_annotation.script_utils import LocalConfig, build_upload_pipeline
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
 def main(
-    dump: str,
+    jsonl_path: str,
     output_path: str,
+    hf_repo: str,
     pipelines_config: str | None = None,
 ):
     if pipelines_config and Path(pipelines_config).is_file():
@@ -18,14 +19,13 @@ def main(
         config = {}
     cfg = LocalConfig(**config)
 
-    pipeline = build_pipeline(
-        dump=dump,
+    pipeline = build_upload_pipeline(
+        jsonl_path=jsonl_path,
         output_path=output_path,
-        languages=cfg.languages,
-        language_threshold=cfg.language_threshold,
+        hf_repo=hf_repo,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "logs" / dump)
+    log_dir = str(PROJECT_ROOT / "upload-logs")
     LocalPipelineExecutor(
         pipeline=pipeline,
         tasks=cfg.tasks,
@@ -40,13 +40,10 @@ if __name__ == "__main__":
 
     cparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     cparser.add_argument(
-        "-d",
-        "--dump",
-        type=str,
-        required=True,
-        help="CommonCrawl dump, e.g. 'CC-MAIN-2024-51' (see https://commoncrawl.org/overview)",
+        "-j", "--jsonl_path", type=str, required=True, help="Path to the directory containing the JSONL files"
     )
     cparser.add_argument("-o", "--output_path", type=str, required=True, help="Output path")
+    cparser.add_argument("-r", "--hf_repo", type=str, required=True, help="Hugging Face repository name")
     cparser.add_argument(
         "-c",
         "--pipelines_config",

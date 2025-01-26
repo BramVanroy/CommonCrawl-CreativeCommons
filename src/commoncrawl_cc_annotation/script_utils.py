@@ -1,12 +1,16 @@
+import dataclasses
+import re
 from datatrove.pipeline.base import PipelineStep
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import (
     LanguageFilter,
     URLFilter,
 )
-from datatrove.pipeline.readers import WarcReader
-from datatrove.pipeline.writers.jsonl import JsonlWriter
+from datatrove.pipeline.readers import JsonlReader, WarcReader
+from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
+from datatrove.data import Document
 from pydantic import BaseModel
+import pyarrow as pa
 
 from .components.annotators import HtmlCopier, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter
@@ -122,3 +126,53 @@ def build_pipeline(
                 expand_metadata=True,
             ),
         ]
+
+
+SCHEMA = pa.schema([
+    ("text", pa.string()),
+    ("id", pa.string()),
+    ("dump", pa.string()),
+    ("url", pa.string()),
+    ("date", pa.string()),
+    ("file_path", pa.string()),
+    ("license_abbr", pa.string()),
+    ("license_version", pa.string()),
+    ("license_location", pa.string()),
+    ("license_in_head", pa.bool_()),
+    ("license_in_footer", pa.bool_()),
+    ("potential_licenses", pa.struct([
+        pa.field("abbr", pa.list_(pa.string())),
+        pa.field("in_footer", pa.list_(pa.bool_())),
+        pa.field("in_head", pa.list_(pa.bool_())),
+        pa.field("location", pa.list_(pa.string())),
+        pa.field("version", pa.list_(pa.string())),
+    ])),
+    ("license_parse_error", pa.bool_()),
+    ("license_disagreement", pa.bool_()),
+    ("language", pa.string()),
+    ("language_score", pa.float64()),
+])
+
+
+
+def job_id_retriever(job_id: str) -> str:
+    return re.search(r"Submitted batch job (\d+)", job_id).group(1)
+
+
+def build_upload_pipeline(jsonl_path: str, output_path: str, hf_repo: str, limit: int = -1) -> list[PipelineStep]:
+    return [
+        JsonlReader(
+            jsonl_path,
+            limit=limit,
+            glob_pattern="**/*.jsonl.gz",
+        ),
+        HuggingFaceDatasetWriter(
+            hf_repo,
+            local_working_dir=output_path,
+            private=True,
+            output_filename="data/${dump}/${language}/${rank}.parquet",
+            compression="zstd",
+            schema=SCHEMA,
+            cleanup=True,
+        ),
+    ]

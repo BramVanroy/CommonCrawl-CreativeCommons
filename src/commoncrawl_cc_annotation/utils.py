@@ -1,8 +1,12 @@
 import base64
+import gzip
 import hashlib
+import json
 import os
 import re
 from pathlib import Path
+
+from tqdm import tqdm
 
 
 # Root directory of this library
@@ -31,3 +35,36 @@ uuid_re = re.compile(r"<urn:uuid:([a-zA-Z0-9]{8}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}
 
 def extract_uuid(uuid_urn: str) -> str:
     return uuid_re.sub("\\1", uuid_urn).replace("-", "")
+
+
+def yield_jsonl_gz_data_robust(pfiles: list[Path], disable_tqdm: bool = False):
+    """
+    Given a set of .jsonl.gz files, this function reads them in a robust way, skipping incomplete lines,
+    and yielding one sample at a time (parse-able JSON line).
+
+    :param pfiles: A list of .jsonl.gz files
+    :return: A generator yielding the contents of the files
+    """
+    with tqdm(total=len(pfiles), desc="Reading", unit="file", disable=disable_tqdm) as pbar:
+        for pfin in pfiles:
+            if pfin.stat().st_size == 0:
+                continue
+
+            with gzip.open(pfin, "rt", encoding="utf-8") as fhin:
+                num_failures = 0
+                while True:
+                    try:
+                        line = fhin.readline()
+                        if not line:
+                            break  # End of currently available content
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        # Handle partial or malformed JSON (incomplete writes)
+                        num_failures += 1
+                    except EOFError:
+                        # Handle unexpected EOF in gzip
+                        num_failures += 1
+                        break
+                if num_failures:
+                    print(f"Skipped {num_failures:,} corrupt line(s) in {pfin}")
+            pbar.update(1)

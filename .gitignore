@@ -2,9 +2,12 @@ configs/
 output/
 logs/
 slurm-logs/
+upload-logs/
 scratches/
 tmp/
 duckdbs/
+parquet_output/
+log.out
 
 downloaded_warc_file.warc.gz
 extracted.html

@@ -1,18 +1,29 @@
-import re
 from pathlib import Path
 
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_pipeline, job_id_retriever
+from commoncrawl_cc_annotation.script_utils import LocalConfig, SlurmConfig, build_upload_pipeline, job_id_retriever
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 def main(
-    dump: str,
+    jsonl_path: str,
     output_path: str,
+    hf_repo: str,
     partition: str,
     pipelines_config: str,
     venv_path: str | None = None,
@@ -23,15 +34,14 @@ def main(
     sbatch_args = {"account": account} if account else {}
     cfg = SlurmConfig(**config)
 
-    pipeline = build_pipeline(
-        dump=dump,
+    pipeline = build_upload_pipeline(
+        jsonl_path=jsonl_path,
         output_path=output_path,
-        languages=cfg.languages,
-        language_threshold=cfg.language_threshold,
+        hf_repo=hf_repo,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "logs" / dump)
-    slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / dump)
+    log_dir = str(PROJECT_ROOT / "upload-logs")
+    slurm_log_dir = str(PROJECT_ROOT / "upload-slurm-logs")
     SlurmPipelineExecutor(
         pipeline=pipeline,
         job_id_retriever=job_id_retriever,
@@ -47,15 +57,15 @@ def main(
         sbatch_args=sbatch_args,
     ).run()
 
-
 if __name__ == "__main__":
     import argparse
 
     cparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     cparser.add_argument(
-        "--dump", type=str, required=True, help="CommonCrawl dump (see https://commoncrawl.org/overview)"
+        "-j", "--jsonl_path", type=str, required=True, help="Path to the directory containing the JSONL files"
     )
-    cparser.add_argument("--output_path", type=str, required=True, help="Output path")
+    cparser.add_argument("-o", "--output_path", type=str, required=True, help="Output path")
+    cparser.add_argument("-r", "--hf_repo", type=str, required=True, help="Hugging Face repository name")
     cparser.add_argument("--partition", type=str, required=True, help="Slurm partition")
     cparser.add_argument("--pipelines_config", type=str, required=True, help="Path to the pipelines YAML config file")
     cparser.add_argument("--venv_path", type=str, help="Path to the virtual environment")

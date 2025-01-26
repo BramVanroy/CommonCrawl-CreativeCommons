@@ -141,5 +141,5 @@ if __name__ == "__main__":
                     drop_columns=["fw2_uuid"] if prefix == "fw2" else None,
                 )
             except Exception as e:
-                print(f"Error for {longlang}: {e}")
+                print(f"Error for {longlang} with {prefix}: {e}")
                 continue
