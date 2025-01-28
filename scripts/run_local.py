@@ -2,8 +2,7 @@ from pathlib import Path
 
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
-
-from commoncrawl_cc_annotation.script_utils import LocalConfig, build_pipeline
+from commoncrawl_cc_annotation.script_utils import BaseConfig, build_main_pipeline, build_containment_pipeline
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
@@ -16,26 +15,40 @@ def main(
         config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
     else:
         config = {}
-    cfg = LocalConfig(**config)
+    cfg = BaseConfig(**config)
 
-    pipeline = build_pipeline(
+    main_output_path = output_path.rstrip("/") + "-main/"
+    main_pipeline = build_main_pipeline(
         dump=dump,
-        output_path=output_path,
-        duckdb_templ_path=cfg.duckdb_templ_path,
-        ignore_duckdb_for=cfg.ignore_duckdb_for,
+        output_path=main_output_path,
         languages=cfg.languages,
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "logs" / dump)
-    LocalPipelineExecutor(
-        pipeline=pipeline,
-        tasks=cfg.tasks,
-        workers=cfg.workers,
-        logging_dir=log_dir,
+    main_executor = LocalPipelineExecutor(
+        pipeline=main_pipeline,
+        tasks=cfg.main_tasks,
+        workers=cfg.main_workers,
+        logging_dir=str(PROJECT_ROOT / "logs" / "main-logs" / dump),
         randomize_start_duration=cfg.randomize_start_duration,
-    ).run()
+    )
+    
+    # Do containment checking (separately because it's intensive on storage)
+    containment_pipeline = build_containment_pipeline(
+        duckdb_templ_path=cfg.duckdb_templ_path,
+        ignore_duckdb_for=cfg.ignore_duckdb_for,
+        input_path=main_output_path,
+        output_path=output_path,
+    )
+    containment_executor = LocalPipelineExecutor(
+        pipeline=containment_pipeline,
+        tasks=cfg.containment_tasks,
+        workers=cfg.containment_workers,
+        logging_dir=str(PROJECT_ROOT / "logs" / "containment-logs" / dump),
+        depends=main_executor,
+    )
 
+    containment_executor.run()
 
 if __name__ == "__main__":
     import argparse

@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import LocalConfig, build_upload_pipeline
+from commoncrawl_cc_annotation.script_utils import BaseUploadConfig, build_upload_pipeline
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
@@ -17,7 +17,7 @@ def main(
         config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
     else:
         config = {}
-    cfg = LocalConfig(**config)
+    cfg = BaseUploadConfig(**config)
 
     pipeline = build_upload_pipeline(
         jsonl_path=jsonl_path,
@@ -25,7 +25,7 @@ def main(
         hf_repo=hf_repo,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "upload-logs")
+    log_dir = str(PROJECT_ROOT / "logs" / "upload-logs")
     LocalPipelineExecutor(
         pipeline=pipeline,
         tasks=cfg.tasks,

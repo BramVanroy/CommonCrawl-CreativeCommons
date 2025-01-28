@@ -1,18 +1,21 @@
 # Creative Commons License annotation of CommonCrawl
 
 ## Done
-- CC-MAIN-2024-51 (started 19/1 @ 13:30)
+
 
 
 ## Running
-- CC-MAIN-2023-06
-- CC-MAIN-2020-05
+- CC-MAIN-2019-30
 
 ## To do
 
+
+- CC-MAIN-2019-30
+- CC-MAIN-2020-05
 - CC-MAIN-2021-04
 - CC-MAIN-2022-05
-- CC-MAIN-2019-30
+- CC-MAIN-2023-06
+- CC-MAIN-2024-51
 
 ## Commands
 

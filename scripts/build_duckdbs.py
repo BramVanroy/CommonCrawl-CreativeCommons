@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Callable
 
 import duckdb
-from datasets import DatasetDict, IterableDatasetDict, concatenate_datasets, load_dataset
-from tqdm import tqdm
+from datasets import DatasetDict, IterableDatasetDict, concatenate_datasets, load_dataset, get_dataset_config_names
+from huggingface_hub import upload_file
 
 from commoncrawl_cc_annotation.utils import extract_uuid
 
@@ -67,9 +67,9 @@ def dataset_to_duckdb(
         else:
             ds = ds.map(lambda sample: {"id": id_prep_func(sample)}, num_proc=num_workers)
 
-    pfarrow = Path(duckdb_path).with_suffix(".parquet").resolve()
-    ds = ds.to_parquet(pfarrow)
-    print(f"Finished writing parquet file to {pfarrow}")
+    farrow = str(Path(duckdb_path).with_suffix(".parquet").resolve())
+    ds.to_parquet(farrow)
+    del ds
 
     if streaming:
         pass
@@ -83,13 +83,16 @@ def dataset_to_duckdb(
                 PRIMARY KEY (dump, id)
             );
             INSERT INTO data
-                SELECT DISTINCT dump, id FROM '{str(pfarrow)}';
+                SELECT DISTINCT dump, id FROM '{farrow}';
             """)
+        row_count = con.execute("SELECT COUNT(*) FROM data").fetchone()[0]
 
-        con.commit()
-        con.close()
-
-    pfarrow.unlink()
+        if row_count == 0:
+            raise ValueError(f"No rows were inserted into the DuckDB database at {duckdb_path}")
+        
+        print(f"The table in {farrow} has {row_count:,} rows.")
+    
+    os.remove(farrow)
 
     return duckdb_path
 
@@ -100,8 +103,7 @@ def fw2_prep_func(sample: dict):
     return extract_uuid(sample["id"])
 
 
-if __name__ == "__main__":
-    langs = [
+KEEP_LOCAL = [
         "fry_Latn",
         "afr_Latn",
         "ita_Latn",
@@ -109,27 +111,40 @@ if __name__ == "__main__":
         "spa_Latn",
         "fra_Latn",
         "deu_Latn",
-    ]
+]
 
-    def process_lang(lang: str):
-        duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{lang}.duckdb"
-        dataset_to_duckdb(
-            "HuggingFaceFW/fineweb-2",
-            duckdb_path,
-            # For fineweb we still have to extract the UUID from the `id` column
-            id_prep_func=fw2_prep_func,
-            dataset_config=lang,
-            overwrite=False,
-            streaming=False,
-            num_loaders=None,
-            num_workers=64,
+
+def build_all_fw2_dbs():
+    dataset_name = "HuggingFaceFW/fineweb-2"
+    config_names = [cfg for cfg in get_dataset_config_names(dataset_name) if "removed" not in cfg]
+
+    for lang in config_names:
+        local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{lang}.duckdb"
+
+        if not os.path.isfile(local_duckdb_path):
+            print(f"Buidling DuckDB for {lang}")
+            dataset_to_duckdb(
+                "HuggingFaceFW/fineweb-2",
+                local_duckdb_path,
+                # For fineweb we still have to extract the UUID from the `id` column
+                id_prep_func=fw2_prep_func,
+                dataset_config=lang,
+                overwrite=False,
+                streaming=False,
+                num_loaders=None,
+                num_workers=64,
+            )
+
+        print(f"Uploading {local_duckdb_path}")
+        upload_file(
+            path_or_fileobj=local_duckdb_path,
+            path_in_repo=Path(local_duckdb_path).name,
+            repo_id="BramVanroy/fineweb-2-duckdbs",
+            repo_type="dataset",
         )
+        if lang not in KEEP_LOCAL:
+            os.remove(local_duckdb_path)
 
-    # Running all of them at the same time will require around 80GB of RAM but
-    # will also put a strain on the file system.
-    # max_workers = 3
-    # with ProcessPoolExecutor(max_workers=min(max_workers, len(langs))) as p:
-    #     p.map(process_lang, langs)
 
-    for lang in tqdm(langs, unit="language", leave=True, position=0):
-        process_lang(lang)
+if __name__ == "__main__":
+    build_all_fw2_dbs()

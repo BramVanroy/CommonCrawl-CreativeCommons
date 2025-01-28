@@ -2,8 +2,7 @@ from pathlib import Path
 
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
-
-from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_pipeline, job_id_retriever
+from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_main_pipeline, build_containment_pipeline, job_id_retriever
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
 
 
@@ -20,32 +19,59 @@ def main(
     sbatch_args = {"account": account} if account else {}
     cfg = SlurmConfig(**config)
 
-    pipeline = build_pipeline(
+    main_output_path = output_path.rstrip("/") + "-main/"
+    main_pipeline = build_main_pipeline(
         dump=dump,
-        output_path=output_path,
-        duckdb_templ_path=cfg.duckdb_templ_path,
-        ignore_duckdb_for=cfg.ignore_duckdb_for,
+        output_path=main_output_path,
         languages=cfg.languages,
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "logs" / dump)
-    slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / dump)
-    SlurmPipelineExecutor(
-        pipeline=pipeline,
+    main_executor = SlurmPipelineExecutor(
+        pipeline=main_pipeline,
         job_id_retriever=job_id_retriever,
-        tasks=cfg.tasks,
-        time=cfg.time,
-        logging_dir=log_dir,
-        slurm_logs_folder=slurm_log_dir,
+        tasks=cfg.main_tasks,
+        workers=cfg.main_workers,
+        time=cfg.main_time,
+        logging_dir=str(PROJECT_ROOT / "logs" / "main-logs" / dump),
+        slurm_logs_folder=str(PROJECT_ROOT / "slurm-logs" / "main-logs" / dump),
         randomize_start_duration=cfg.randomize_start_duration,
-        mem_per_cpu_gb=cfg.mem_per_cpu_gb,
+        mem_per_cpu_gb=cfg.main_mem_per_cpu_gb,
+        cpus_per_task=cfg.main_cpus_per_task,
         partition=partition,
         venv_path=venv_path,
         qos="",
         sbatch_args=sbatch_args,
-        job_name="process",
-    ).run()
+        job_name="process-main",
+    )
+
+    # Do containment checking (separately because it's intensive on storage)
+    containment_pipeline = build_containment_pipeline(
+        duckdb_templ_path=cfg.duckdb_templ_path,
+        ignore_duckdb_for=cfg.ignore_duckdb_for,
+        input_path=main_output_path,
+        output_path=output_path,
+    )
+    containment_executor = SlurmPipelineExecutor(
+        pipeline=containment_pipeline,
+        job_id_retriever=job_id_retriever,
+        tasks=cfg.containment_tasks,
+        workers=cfg.containment_workers,
+        time=cfg.containment_time,
+        logging_dir=str(PROJECT_ROOT / "logs" / "containment-logs" / dump),
+        slurm_logs_folder=str(PROJECT_ROOT / "slurm-logs" / "containment-logs" / dump),
+        mem_per_cpu_gb=cfg.containment_mem_per_cpu_gb,
+        cpus_per_task=cfg.containment_cpus_per_task,
+        partition=partition,
+        venv_path=venv_path,
+        qos="",
+        sbatch_args=sbatch_args,
+        job_name="process-containment",
+        depends=main_executor,
+    )
+
+    containment_executor.run()
+
 
 
 if __name__ == "__main__":

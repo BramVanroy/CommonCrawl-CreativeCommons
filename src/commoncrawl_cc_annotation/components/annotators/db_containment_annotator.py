@@ -37,7 +37,7 @@ class DatabaseContainmentAnnotator(BaseAnnotator):
         con = self.cons[full_lang]
         uuid = extract_uuid(doc.id)
         dump = doc.metadata["dump"]
-        query = "SELECT EXISTS (SELECT 1 FROM dataset WHERE dump = ? AND id = ?)"
+        query = "SELECT EXISTS (SELECT 1 FROM data WHERE dump = ? AND id = ?)"
         exists = con.execute(query, (dump, uuid)).fetchone()[0]
         doc.metadata[self.added_key] = bool(exists)
         return doc

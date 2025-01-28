@@ -28,39 +28,51 @@ LANGUAGES = [
     "spa_Latn",
 ]
 
-
-class _BaseConfig(BaseModel):
+class BaseUploadConfig(BaseModel):
     """Base Config class for local and Slurm configurations"""
 
     tasks: int = 1
+    workers: int = -1
     randomize_start_duration: int = 0
-    language_threshold: float = 0.65
-    languages: list = LANGUAGES
-    keep_with_license_only: bool = True
-    duckdb_templ_path: str | None = None
-    ignore_duckdb_for: list[str] = ["eng_Latn"]
     limit: int = -1
 
-
-class LocalConfig(_BaseConfig):
-    """Local configuration for running the pipeline on a local machine"""
-
-    workers: int = -1
-
-
-class SlurmConfig(_BaseConfig):
+class SlurmUploadConfig(BaseUploadConfig):
     """Slurm configuration for running the pipeline on a cluster"""
 
     time: str
     mem_per_cpu_gb: int = 2
     cpus_per_task: int = 1
 
+class BaseConfig(BaseModel):
+    """Base Config class for local and Slurm configurations"""
 
-def build_pipeline(
+    main_tasks: int = 1
+    containment_tasks: int = 1
+    main_workers: int = -1
+    containment_workers: int = -1
+
+    randomize_start_duration: int = 0
+    language_threshold: float = 0.65
+    languages: list = LANGUAGES
+    duckdb_templ_path: str | None = None
+    ignore_duckdb_for: list[str] = ["eng_Latn"]
+    limit: int = -1
+
+
+class SlurmConfig(BaseConfig):
+    """Slurm configuration for running the pipeline on a cluster"""
+
+    main_time: str = "3:00:00"
+    containment_time: str = "3:00:00"
+    main_mem_per_cpu_gb: int = 4
+    containment_mem_per_cpu_gb: int = 4
+    main_cpus_per_task: int = 1
+    containment_cpus_per_task: int = 16
+
+
+def build_main_pipeline(
     dump: str,
     output_path: str,
-    duckdb_templ_path: str,
-    ignore_duckdb_for: list[str],
     languages: list[str],
     language_threshold: float = 0.65,
     limit: int = -1,
@@ -70,10 +82,8 @@ def build_pipeline(
 
     Args:
         dump (str): Common Crawl dump to process
-        output_path (str): Main output path. JSONL.GZ files will be saved in subfolders based on language
-        duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
-        Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
-        as found in the concatenation of `{metadata["language"]}_{metadata["language_script"]}`.
+        output_path (str): Path to the output directory. Files will be written as
+        ${language}_${language_script}/${rank}.jsonl.gz
         languages (list[str]): List of languages to filter for
         language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
@@ -82,9 +92,6 @@ def build_pipeline(
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
-    if not duckdb_templ_path or "{language}" not in duckdb_templ_path:
-        raise ValueError("The duckdb_templ_path must contain the placeholder '{language}'")
-
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -99,57 +106,86 @@ def build_pipeline(
         Trafilatura(favour_precision=True, timeout=600.0),
         EmptyTextFilter(),  # filter items with empty extracted text
         LanguageFilter(backend="glotlid", languages=languages, language_threshold=language_threshold),
-        DatabaseContainmentAnnotator(
-            duckdb_templ_path=duckdb_templ_path,
-            ignore_duckdb_for=ignore_duckdb_for,
-            added_key="found_in_fw2",
-        ),
         # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
         PIIFormatter(),  # remove PII
         SymbolLinesFormatter(symbols_to_remove=["|"], replace_char="\n"),  # fix trafilatura table artifacts
         JsonlWriter(
             output_folder=f"{output_path}/",
-            output_filename="${language}/${rank}.jsonl.gz",
-            expand_metadata=True,
+        )
+    ]
+
+def build_containment_pipeline(
+    input_path: str,
+    duckdb_templ_path: str,
+    ignore_duckdb_for: list[str],
+    output_path: str,
+) -> list[PipelineStep]:
+    """
+    Build a pipeline for annotating the web pages with the database containment information.
+    
+    Args:
+        duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
+        Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
+        as found in the concatenation of `{metadata["language"]}_{metadata["language_script"]}`.
+        ignore_duckdb_for (list[str]): List of languages to ignore when querying the DuckDB databases. For
+        these languages, the 'found' field will be set to `None`.
+        output_path (str): Path to use for the input reading as well as output writing.
+    """
+    if not duckdb_templ_path or "{language}" not in duckdb_templ_path:
+        raise ValueError("The duckdb_templ_path must contain the placeholder '{language}'")
+
+    return [
+        JsonlReader(
+            data_folder=input_path,
+            glob_pattern="**/*.jsonl.gz",
         ),
+        DatabaseContainmentAnnotator(
+            duckdb_templ_path=duckdb_templ_path,
+            ignore_duckdb_for=ignore_duckdb_for,
+            added_key="found_in_fw2",
+        ),        
+        JsonlWriter(
+            output_folder=f"{output_path}/",
+            output_filename="${language}_${language_script}/${rank}.jsonl.gz",
+            expand_metadata=True,
+        )
     ]
 
 
 SCHEMA = pa.schema(
     [
-        ("text", pa.string()),
-        ("id", pa.string()),
-        ("dump", pa.string()),
-        ("url", pa.string()),
-        ("date", pa.string()),
-        ("file_path", pa.string()),
-        ("license_abbr", pa.string()),
-        ("license_version", pa.string()),
-        ("license_location", pa.string()),
-        ("license_in_head", pa.bool_()),
-        ("license_in_footer", pa.bool_()),
-        (
+        pa.field("text", pa.string(), nullable=False),
+        pa.field("id", pa.string(), nullable=False),
+        pa.field("dump", pa.string(), nullable=False),
+        pa.field("url", pa.string(), nullable=False),
+        pa.field("date", pa.string(), nullable=False),
+        pa.field("file_path", pa.string(), nullable=False),
+        pa.field("license_abbr", pa.string(), nullable=False),
+        pa.field("license_version", pa.string(), nullable=True),
+        pa.field("license_location", pa.string(), nullable=False),
+        pa.field("license_in_head", pa.bool_(), nullable=False),
+        pa.field("license_in_footer", pa.bool_(), nullable=False),
+        pa.field(
             "potential_licenses",
             pa.struct(
                 [
-                    pa.field("abbr", pa.list_(pa.string())),
-                    pa.field("in_footer", pa.list_(pa.bool_())),
-                    pa.field("in_head", pa.list_(pa.bool_())),
-                    pa.field("location", pa.list_(pa.string())),
-                    pa.field("version", pa.list_(pa.string())),
+                    pa.field("abbr", pa.list_(pa.string()), nullable=False),
+                    pa.field("in_footer", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("in_head", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("location", pa.list_(pa.string()), nullable=False),
+                    pa.field("version", pa.list_(pa.string()), nullable=False),
                 ]
             ),
         ),
-        ("license_parse_error", pa.bool_()),
-        ("license_disagreement", pa.bool_()),
-        ("language", pa.string()),
-        ("language_script", pa.string()),
-        ("language_score", pa.float64()),
-        ("found_in_fw2", pa.bool_()),
+        pa.field("license_parse_error", pa.bool_(), nullable=False),
+        pa.field("license_disagreement", pa.bool_(), nullable=False),
+        pa.field("language_script", pa.string(), nullable=False),
+        pa.field("language", pa.string(), nullable=False),
+        pa.field("language_score", pa.float64(), nullable=False),
+        pa.field("found_in_fw2", pa.bool_(), nullable=True),
     ]
 )
-
 
 def job_id_retriever(job_id: str) -> str:
     return re.search(r"Submitted batch job (\d+)", job_id).group(1)

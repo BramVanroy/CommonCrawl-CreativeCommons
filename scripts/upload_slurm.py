@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_upload_pipeline, job_id_retriever
+from commoncrawl_cc_annotation.script_utils import SlurmUploadConfig, build_upload_pipeline, job_id_retriever
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
 
 
@@ -19,7 +19,7 @@ def main(
     print_system_stats()
     config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
     sbatch_args = {"account": account} if account else {}
-    cfg = SlurmConfig(**config)
+    cfg = SlurmUploadConfig(**config)
 
     pipeline = build_upload_pipeline(
         jsonl_path=jsonl_path,
@@ -27,8 +27,8 @@ def main(
         hf_repo=hf_repo,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "upload-logs")
-    slurm_log_dir = str(PROJECT_ROOT / "upload-slurm-logs")
+    log_dir = str(PROJECT_ROOT / "logs" / "upload-logs")
+    slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / "upload-logs")
     SlurmPipelineExecutor(
         pipeline=pipeline,
         job_id_retriever=job_id_retriever,
