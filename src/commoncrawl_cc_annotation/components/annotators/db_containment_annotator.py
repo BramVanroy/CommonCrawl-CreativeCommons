@@ -23,16 +23,18 @@ class DatabaseContainmentAnnotator(BaseAnnotator):
         import duckdb
 
         language = doc.metadata["language"]
-        if language in self.ignore_duckdb_for:
+        language_script = doc.metadata["language_script"]
+        full_lang = f"{language}_{language_script}"
+        if full_lang in self.ignore_duckdb_for:
             doc.metadata[self.added_key] = None
             return doc
 
-        if language not in self.cons:
-            duckdb_path = self.duckdb_template.format(language=language)
+        if full_lang not in self.cons:
+            duckdb_path = self.duckdb_template.format(language=full_lang)
             con = duckdb.connect(duckdb_path, read_only=True)
-            self.cons[language] = con
+            self.cons[full_lang] = con
 
-        con = self.cons[language]
+        con = self.cons[full_lang]
         uuid = extract_uuid(self.metadata["id"])
         dump = self.metadata["dump"]
         query = "SELECT EXISTS (SELECT 1 FROM dataset WHERE dump = ? AND id = ?)"
@@ -43,5 +45,3 @@ class DatabaseContainmentAnnotator(BaseAnnotator):
     def __del__(self):
         for con in self.cons.values():
             con.close()
-
-        super().__del__()

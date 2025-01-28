@@ -73,7 +73,7 @@ def build_pipeline(
         output_path (str): Main output path. JSONL.GZ files will be saved in subfolders based on language
         duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
         Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
-        as found in `metadata["language"]`.
+        as found in the concatenation of `{metadata["language"]}_{metadata["language_script"]}`.
         languages (list[str]): List of languages to filter for
         language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
@@ -144,6 +144,7 @@ SCHEMA = pa.schema(
         ("license_parse_error", pa.bool_()),
         ("license_disagreement", pa.bool_()),
         ("language", pa.string()),
+        ("language_script", pa.string()),
         ("language_score", pa.float64()),
         ("found_in_fw2", pa.bool_()),
     ]
