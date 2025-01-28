@@ -102,24 +102,23 @@ def fw2_prep_func(sample: dict):
 
 if __name__ == "__main__":
     langs = [
-        ("fry_Latn", "fy"),
-        ("afr_Latn", "af"),
-        ("ita_Latn", "it"),
-        ("nld_Latn", "nl"),
-        ("spa_Latn", "es"),
-        ("fra_Latn", "fr"),
-        ("deu_Latn", "de"),
+        "fry_Latn",
+        "afr_Latn",
+        "ita_Latn",
+        "nld_Latn",
+        "spa_Latn",
+        "fra_Latn",
+        "deu_Latn",
     ]
 
-    def process_lang(lang: tuple[str, str]):
-        long_lang, short_lang = lang
-        duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{short_lang}.duckdb"
+    def process_lang(lang: str):
+        duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{lang}.duckdb"
         dataset_to_duckdb(
             "HuggingFaceFW/fineweb-2",
             duckdb_path,
             # For fineweb we still have to extract the UUID from the `id` column
             id_prep_func=fw2_prep_func,
-            dataset_config=long_lang,
+            dataset_config=lang,
             overwrite=False,
             streaming=False,
             num_loaders=None,
