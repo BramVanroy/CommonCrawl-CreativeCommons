@@ -23,6 +23,8 @@ def main(
     pipeline = build_pipeline(
         dump=dump,
         output_path=output_path,
+        duckdb_templ_path=cfg.duckdb_templ_path,
+        ignore_duckdb_for=cfg.ignore_duckdb_for,
         languages=cfg.languages,
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,

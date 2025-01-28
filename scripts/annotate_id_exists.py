@@ -1,145 +1,139 @@
-from typing import Callable
+import os
+from pathlib import Path
 
 import duckdb
 from datasets import load_dataset
+from huggingface_hub import HfApi
 
 from commoncrawl_cc_annotation.utils import extract_uuid
 
 
-def duckdb_process(batch: list[str], duckdb_path: str, added_key: str, db_column_name: str):
+hf_api = HfApi()
+
+
+def duckdb_process(dumps: list[str], uuids: list[str], duckdb_path: str, added_key: str):
+    batch = list(zip(dumps, uuids))
     con = duckdb.connect(duckdb_path, read_only=True)
-    results = {added_key: []}
-    for uid in batch:
-        uid = extract_uuid(uid)
-        query = f"SELECT EXISTS (FROM data WHERE {db_column_name} = ?) AS id_exists;"
-        result = con.execute(query, [uid]).fetchone()[0]
-        results[added_key].append(result)
+    placeholders = ", ".join(["(?, ?)"] * len(batch))
+    query = f"""
+        SELECT CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END AS exists
+        FROM (VALUES {placeholders}) AS v(dump, id)
+        LEFT JOIN data d
+        ON v.dump = d.dump AND v.id = d.id;
+    """
+
+    results = con.execute(query, [value for pair in batch for value in pair]).fetchall()
+    results = [bool(row[0]) for row in results]
     con.close()
-    return results
+
+    return {added_key: results}
 
 
 def annotate_id_exists(
     dataset_name: str,
-    duckdb_path: str,
-    unique_column_ds: str = "id",
-    unique_column_db: str = "id",
-    unique_column_func: Callable = None,
-    dataset_config: str | None = None,
-    push_to_hub: bool = False,
+    duckdb_templ_path: str = "duckdbs/fw2-{lang}.duckdb",
     added_key: str = "id_found",
     num_loaders: int | None = None,
     num_workers: int | None = None,
-    batch_size: int = 1000,
+    batch_size: int = 500,
     verbose: bool = False,
-    split_name: str = "train",
-    drop_columns: list[str] | None = None,
+    dumps_to_process: list[str] | None = None,
+    langs_to_process: list[str] | None = None,
 ):
     """
     Annotate a dataset with a key that indicates whether the ID is in the given DuckDB database.
 
     Args:
         dataset_name: The name of the dataset
-        duckdb_path: The path to the DuckDB database
-        unique_column_ds: The name of the unique column in the dataset
-        unique_column_db: The name of the unique column in the database
-        unique_column_func: An optional function to apply to each sample to add the unique column
-        dataset_config: The configuration of the dataset
-        push_to_hub: Whether to push the annotated dataset to the Hub with the same name and config
+        duckdb_templ_path: The path template to the DuckDB database. Must contain {lang} as a placeholder.
         added_key: The key to add to the dataset to indicate whether the ID is in the database
         num_loaders: The number of parallel processes to use for (down)loading the dataset
         num_workers: The number of parallel processes to use for annotation. Note that num_workers and batch_size impact memory usage!
         batch_size: The batch size for the annotation
         verbose: Whether to print the number of items in the dataset and the number of items in the database.
-        split_name: The split to annotate
-        drop_columns: The columns to drop from the dataset after annotation
+        dumps_to_process: The dumps to process. If None, all dumps are processed.
+        langs_to_process: The languages to process. If None, all languages are processed.
     """
-    ds = load_dataset(dataset_name, dataset_config, split=split_name, num_proc=num_loaders)
-    if unique_column_func is not None:
-        ds = ds.map(unique_column_func, num_proc=num_workers)
+    dumps_to_process = dumps_to_process or []
+    langs_to_process = langs_to_process or []
 
-    ds = ds.map(
-        duckdb_process,
-        input_columns=unique_column_ds,
-        batch_size=batch_size,
-        num_proc=num_workers,
-        batched=True,
-        fn_kwargs={"duckdb_path": duckdb_path, "added_key": added_key, "db_column_name": unique_column_db},
-    )
+    # hf_api.snapshot_download(
+    #     dataset_name,
+    #     repo_type="dataset",
+    #     cache_dir=None,
+    #     local_dir=temp_dir,
+    #     allow_patterns="*.parquet",
+    #     max_workers=num_loaders,
+    # )
+    ptemp_dir = Path(temp_dir)
+    print(ptemp_dir)
+    for crawl_dir in ptemp_dir.joinpath("data").iterdir():
+        if crawl_dir.is_dir():
+            crawl = crawl_dir.stem
+            if crawl not in dumps_to_process:
+                continue
+            for lang_dir in crawl_dir.iterdir():
+                if lang_dir.is_dir():
+                    lang = lang_dir.stem
+                    if lang not in langs_to_process:
+                        continue
+                    duckdb_path = duckdb_templ_path.format(lang=lang)
+                    data_dir = str(lang_dir).replace(temp_dir, "").lstrip("/")
+                    ds = load_dataset(
+                        "parquet", data_files=[str(f) for f in lang_dir.glob("*.parquet")], split="train"
+                    )
 
-    if drop_columns:
-        ds = ds.remove_columns(drop_columns)
+                    ds = ds.map(
+                        lambda cc_id: {"db_uuid": extract_uuid(cc_id)}, input_columns="id", num_proc=num_workers
+                    )
 
-    if verbose:
-        num_items = len(ds)
-        num_in_db = sum([1 for is_in_db in ds[added_key] if is_in_db])
-        print(
-            f"Dataset {dataset_name} ({added_key}): all={num_items:,}, in_db={num_in_db:,}, not_in_db={num_items - num_in_db:,}"
-        )
+                    ds = ds.map(
+                        duckdb_process,
+                        input_columns=["dump", "db_uuid"],
+                        batch_size=batch_size,
+                        num_proc=num_workers,
+                        batched=True,
+                        fn_kwargs={"duckdb_path": duckdb_path, "added_key": added_key},
+                    )
 
-    if push_to_hub:
-        ds.push_to_hub(dataset_name, config_name=dataset_config or "default")
+                    ds = ds.remove_columns("db_uuid")
 
+                    if verbose:
+                        num_items = len(ds)
+                        num_in_db = sum([1 for is_in_db in ds[added_key] if is_in_db])
+                        print(
+                            f"Dataset {dataset_name} ({added_key}): all={num_items:,}, in_db={num_in_db:,}, not_in_db={num_items - num_in_db:,}"
+                        )
 
-def fw2_prep_func(sample: dict):
-    # "<urn:uuid:6a8657b3-84d0-45df-b4b2-5fb6eef55ee5>" -> "6a8657b3-84d0-45df-b4b2-5fb6eef55ee5"
-    # = compatible with duckdb UUID type
-    return {"fw2_uuid": extract_uuid(sample["id"])}
+                    hf_api.delete_files(
+                        dataset_name,
+                        repo_type="dataset",
+                        delete_patterns=[f"{data_dir}/*.parquet"],
+                    )
 
-
-def hplt2_prep_func(sample: dict):
-    # They use a hash of the file path, URL, and timestamp, but this is currently not implemented here
-    # because they seem to use a datestamp/ms timestamp, and not a string for the date
-    # While that makes sense, I should do further testing to ensure the conversion
-    # is done identical to theirs and can't readily find it in their codebase
-    # https://github.com/hplt-project/monotextor-slurm/blob/629a45d0eae9528238072a086f71d978004cac4d/scripts/annotate.py#L179
-    # return {"hplt2_uuid": xxh128_hexdigest(sample["file_path"] + sample["url"] + sample["date"])}
-    # --------------------------------------------------------------------------------------^ should be converted to ms timestamp
-    raise NotImplementedError
+                    ds.push_to_hub(
+                        "BramVanroy/CommonCrawl-CreativeCommons",
+                        config_name=f"{crawl}-{lang}",
+                        data_dir=data_dir,
+                    )
+                    # 17.7
 
 
 if __name__ == "__main__":
-    # uid = "<urn:uuid:01e93f94-baa5-4666-a694-080ecb0b21c9>"
-    # uid = extract_uuid(uid)
-    # con = duckdb.connect("/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fw2-nld_Latn.duckdb")
+    dumps_to_process = ["CC-MAIN-2024-51"]
+    langs_to_process = ["af"]
+    langs_to_process = ["af", "nl", "fr", "de", "es", "it", "fy"]
+    temp_dir = "/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/CommonCrawl-CreativeCommons"
+    duckdb_dir = "/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2"
 
-    # # Get all "id" in database
-    # ids = con.execute("SELECT id FROM data LIMIT 10;").fetchall()
-    # # To python object
-    # ids = [str(id[0]).replace("-", "") for id in ids]
-    # print(ids)
-
-    langs = [
-        ("af", "afr_Latn"),
-        ("nl", "nld_Latn"),
-        ("fr", "fra_Latn"),
-        ("de", "deu_Latn"),
-        ("es", "spa_Latn"),
-        ("it", "ita_Latn"),
-        ("fy", "fry_Latn"),
-    ]
-    for dataset_name, subdir, prefix in [
-        ("HuggingFaceFW/fineweb-2", "fineweb-2", "fw2"),
-        ("HPLT/HPLT2.0_cleaned", "HPLT2.0_cleaned", "hplt2"),  # Won't work because of preprocessing
-    ]:
-        found_key = f"found_in_{prefix}"
-        for shortlang, longlang in langs:
-            duckdb_path = (
-                f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/{subdir}/{prefix}-{longlang}.duckdb"
-            )
-            try:
-                annotate_id_exists(
-                    "BramVanroy/CommonCrawl-CreativeCommons",
-                    duckdb_path,
-                    unique_column_func=fw2_prep_func if prefix == "fw2" else hplt2_prep_func,
-                    unique_column_ds="fw2_uuid" if prefix == "fw2" else "id",
-                    dataset_config=shortlang,
-                    num_workers=96,
-                    num_loaders=8,
-                    added_key=found_key,
-                    verbose=True,
-                    push_to_hub=True,
-                    drop_columns=["fw2_uuid"] if prefix == "fw2" else None,
-                )
-            except Exception as e:
-                print(f"Error for {longlang} with {prefix}: {e}")
-                continue
+    annotate_id_exists(
+        "BramVanroy/CommonCrawl-CreativeCommons",
+        duckdb_templ_path=os.path.join(duckdb_dir, "fw2-{lang}.duckdb"),
+        added_key="in_fw2",
+        num_loaders=2,
+        num_workers=2,
+        batch_size=500,
+        verbose=True,
+        dumps_to_process=dumps_to_process,
+        langs_to_process=langs_to_process,
+    )

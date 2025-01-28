@@ -7,24 +7,25 @@ from datatrove.pipeline.filters import (
     LanguageFilter,
     URLFilter,
 )
+from datatrove.pipeline.formatters import FTFYFormatter, PIIFormatter, SymbolLinesFormatter
 from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from pydantic import BaseModel
 
-from .components.annotators import HtmlCopier, LicenseAnnotator
+from .components.annotators import DatabaseContainmentAnnotator, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter
 
 
-# Dutch, Frisian, English, Spanish, French, Italian, German, Afrikaans
+# Afrikaans, German, English, French, Frisian, Italian, Dutch, Spanish
 LANGUAGES = [
-    "nl",
-    "fy",
-    "en",
-    "es",
-    "fr",
-    "it",
-    "de",
-    "af",
+    "afr_Latn",
+    "deu_Latn",
+    "eng_Latn",
+    "fra_Latn",
+    "fry_Latn",
+    "ita_Latn",
+    "nld_Latn",
+    "spa_Latn",
 ]
 
 
@@ -36,6 +37,8 @@ class _BaseConfig(BaseModel):
     language_threshold: float = 0.65
     languages: list = LANGUAGES
     keep_with_license_only: bool = True
+    duckdb_templ_path: str | None = None
+    ignore_duckdb_for: list[str] = ["eng_Latn"]
     limit: int = -1
 
 
@@ -56,10 +59,11 @@ class SlurmConfig(_BaseConfig):
 def build_pipeline(
     dump: str,
     output_path: str,
+    duckdb_templ_path: str,
+    ignore_duckdb_for: list[str],
     languages: list[str],
     language_threshold: float = 0.65,
     limit: int = -1,
-    trafiltura_first: bool = False,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -67,64 +71,49 @@ def build_pipeline(
     Args:
         dump (str): Common Crawl dump to process
         output_path (str): Main output path. JSONL.GZ files will be saved in subfolders based on language
+        duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
+        Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
+        as found in `metadata["language"]`.
         languages (list[str]): List of languages to filter for
         language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
         -1 = no limit. Defaults to -1.
-        trafiltura_first (bool, optional): If True, the pipeline will first run the HTML copier, then
-        Trafilatura, and finally the license annotator. If False, the pipeline will run the license
-        annotator first. This was intended for benchmarking. The default (false) is about 10% faster.
-        Defaults to False.
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
-    if trafiltura_first:
-        return [
-            WarcReader(
-                f"s3://commoncrawl/crawl-data/{dump}/segments/",
-                glob_pattern="*/warc/*",
-                default_metadata={"dump": dump},
-                limit=limit,
-            ),
-            URLFilter(),
-            EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
-            HtmlCopier(),
-            Trafilatura(favour_precision=True, timeout=600.0),
-            EmptyTextFilter(),  # filter items with empty extracted text
-            LanguageFilter(languages=languages, language_threshold=language_threshold),
-            LicenseAnnotator(
-                html_in_metadata=True,
-                remove_html=True,
-            ),
-            LicenseFilter(),
-            JsonlWriter(
-                output_folder=f"{output_path}/",
-                output_filename="${language}/${rank}.jsonl.gz",
-                expand_metadata=True,
-            ),
-        ]
-    else:
-        return [
-            WarcReader(
-                f"s3://commoncrawl/crawl-data/{dump}/segments/",
-                glob_pattern="*/warc/*",
-                default_metadata={"dump": dump},
-                limit=limit,
-            ),
-            URLFilter(),
-            EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
-            LicenseAnnotator(),
-            LicenseFilter(),
-            Trafilatura(favour_precision=True, timeout=600.0),
-            EmptyTextFilter(),  # filter items with empty extracted text
-            LanguageFilter(languages=languages, language_threshold=language_threshold),
-            JsonlWriter(
-                output_folder=f"{output_path}/",
-                output_filename="${language}/${rank}.jsonl.gz",
-                expand_metadata=True,
-            ),
-        ]
+    if not duckdb_templ_path or "{language}" not in duckdb_templ_path:
+        raise ValueError("The duckdb_templ_path must contain the placeholder '{language}'")
+
+    return [
+        WarcReader(
+            f"s3://commoncrawl/crawl-data/{dump}/segments/",
+            glob_pattern="*/warc/*",
+            default_metadata={"dump": dump},
+            limit=limit,
+        ),
+        URLFilter(),
+        EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
+        LicenseAnnotator(),
+        LicenseFilter(),
+        Trafilatura(favour_precision=True, timeout=600.0),
+        EmptyTextFilter(),  # filter items with empty extracted text
+        LanguageFilter(backend="glotlid", languages=languages, language_threshold=language_threshold),
+        DatabaseContainmentAnnotator(
+            duckdb_templ_path=duckdb_templ_path,
+            ignore_duckdb_for=ignore_duckdb_for,
+            added_key="found_in_fw2",
+        ),
+        # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py
+        FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
+        PIIFormatter(),  # remove PII
+        SymbolLinesFormatter(symbols_to_remove=["|"], replace_char="\n"),  # fix trafilatura table artifacts
+        JsonlWriter(
+            output_folder=f"{output_path}/",
+            output_filename="${language}/${rank}.jsonl.gz",
+            expand_metadata=True,
+        ),
+    ]
 
 
 SCHEMA = pa.schema(
@@ -156,6 +145,7 @@ SCHEMA = pa.schema(
         ("license_disagreement", pa.bool_()),
         ("language", pa.string()),
         ("language_score", pa.float64()),
+        ("found_in_fw2", pa.bool_()),
     ]
 )
 

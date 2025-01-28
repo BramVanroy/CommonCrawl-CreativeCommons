@@ -34,6 +34,8 @@ uuid_re = re.compile(r"<urn:uuid:([a-zA-Z0-9]{8}-?[a-zA-Z0-9]{4}-?[a-zA-Z0-9]{4}
 
 
 def extract_uuid(uuid_urn: str) -> str:
+    # Extract the UUID from the URN
+    # "<urn:uuid:6a8657b3-84d0-45df-b4b2-5fb6eef55ee5>" -> "6a8657b384d045dfb4b25fb6eef55ee5"
     return uuid_re.sub("\\1", uuid_urn).replace("-", "")
 
 

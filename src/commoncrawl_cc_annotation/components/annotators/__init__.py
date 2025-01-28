@@ -1,2 +1,3 @@
+from .db_containment_annotator import DatabaseContainmentAnnotator
 from .html_copier import HtmlCopier
 from .license_annotator import LicenseAnnotator
