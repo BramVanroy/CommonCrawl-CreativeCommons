@@ -33,6 +33,7 @@ dependencies = [
     "beautifulsoup4",
     "datasets",
     "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/BramVanroy/datatrove",
+    "duckdb",
     "hf_transfer",
     "html5lib",
     "huggingface_hub",
