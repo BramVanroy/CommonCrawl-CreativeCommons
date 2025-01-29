@@ -18,9 +18,10 @@ def main(
     cfg = BaseConfig(**config)
 
     main_output_path = output_path.rstrip("/") + "-main/"
+    main_dump_output_path = main_output_path + dump + "/"
     main_pipeline = build_main_pipeline(
         dump=dump,
-        output_path=main_output_path,
+        output_path=main_dump_output_path,
         languages=cfg.languages,
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,
@@ -34,11 +35,12 @@ def main(
     )
     
     # Do containment checking (separately because it's intensive on storage)
+    dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
     containment_pipeline = build_containment_pipeline(
         duckdb_templ_path=cfg.duckdb_templ_path,
         ignore_duckdb_for=cfg.ignore_duckdb_for,
-        input_path=main_output_path,
-        output_path=output_path,
+        input_path=main_dump_output_path,
+        output_path=dump_output_path,
     )
     containment_executor = LocalPipelineExecutor(
         pipeline=containment_pipeline,

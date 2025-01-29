@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
+from time import sleep
 from typing import Callable
 
 import duckdb
 from datasets import DatasetDict, IterableDatasetDict, concatenate_datasets, load_dataset, get_dataset_config_names
-from huggingface_hub import upload_file
-
+from huggingface_hub import upload_file, list_repo_files
+from huggingface_hub.errors import HfHubHTTPError
 from commoncrawl_cc_annotation.utils import extract_uuid
 
 
@@ -114,14 +115,17 @@ KEEP_LOCAL = [
 ]
 
 
-def build_all_fw2_dbs():
+def build_all_fw2_dbs(overwrite: bool = False):
     dataset_name = "HuggingFaceFW/fineweb-2"
     config_names = [cfg for cfg in get_dataset_config_names(dataset_name) if "removed" not in cfg]
+    existing_files_in_repo = list_repo_files(repo_id="BramVanroy/fineweb-2-duckdbs", repo_type="dataset")
 
     for lang in config_names:
         local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{lang}.duckdb"
+        path_in_repo = Path(local_duckdb_path).name
+        exists_in_repo = path_in_repo in existing_files_in_repo
 
-        if not os.path.isfile(local_duckdb_path):
+        if overwrite or (not os.path.isfile(local_duckdb_path) and not exists_in_repo):
             print(f"Buidling DuckDB for {lang}")
             dataset_to_duckdb(
                 "HuggingFaceFW/fineweb-2",
@@ -135,15 +139,28 @@ def build_all_fw2_dbs():
                 num_workers=64,
             )
 
-        print(f"Uploading {local_duckdb_path}")
-        upload_file(
-            path_or_fileobj=local_duckdb_path,
-            path_in_repo=Path(local_duckdb_path).name,
-            repo_id="BramVanroy/fineweb-2-duckdbs",
-            repo_type="dataset",
-        )
-        if lang not in KEEP_LOCAL:
-            os.remove(local_duckdb_path)
+        if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
+            print(f"Uploading {local_duckdb_path}")
+            num_retries = 3
+            while num_retries:
+                try:
+                    upload_file(
+                        path_or_fileobj=local_duckdb_path,
+                        path_in_repo=path_in_repo,
+                        repo_id="BramVanroy/fineweb-2-duckdbs",
+                        repo_type="dataset",
+                    )
+                except HfHubHTTPError as exc:
+                    num_retries -= 1
+                    if num_retries == 0:
+                        raise exc
+                    else:
+                        sleep(60 / num_retries)
+                else:
+                    break
+
+            if lang not in KEEP_LOCAL:
+                os.remove(local_duckdb_path)
 
 
 if __name__ == "__main__":
