@@ -48,14 +48,22 @@ def dataset_to_duckdb(
         os.makedirs(os.path.dirname(duckdb_path), exist_ok=True)
 
     print(f"Starting to build DuckDB file at {duckdb_path}")
-    ds = load_dataset(
-        dataset_name,
-        dataset_config,
-        streaming=streaming,
-        num_proc=num_loaders if not streaming else None,
-        # Only works when the origin files are parquet.
-        columns=["dump", "id"],
-    )
+    try:
+        ds = load_dataset(
+            dataset_name,
+            dataset_config,
+            streaming=streaming,
+            num_proc=num_loaders if not streaming else None,
+            # Only works when the origin files are parquet.
+            columns=["dump", "id"],
+        )
+    except TypeError:
+        ds = load_dataset(
+            dataset_name,
+            dataset_config,
+            streaming=streaming,
+            num_proc=num_loaders if not streaming else None,
+        )
 
     if isinstance(ds, DatasetDict) or isinstance(ds, IterableDatasetDict):
         ds = concatenate_datasets([ds[split] for split in list(ds.keys())])
