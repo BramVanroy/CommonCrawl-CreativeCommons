@@ -2,7 +2,8 @@ from pathlib import Path
 
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
-from commoncrawl_cc_annotation.script_utils import BaseConfig, build_main_pipeline, build_containment_pipeline
+
+from commoncrawl_cc_annotation.script_utils import BaseConfig, build_containment_pipeline, build_main_pipeline
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
@@ -16,6 +17,14 @@ def main(
     else:
         config = {}
     cfg = BaseConfig(**config)
+
+    # If dump is more recent than 2024-18, we auto-set the found_in_fw2
+    # column to False because FW2 does not have that data. That avoids the expensive
+    # containment checking.
+    dump_month = int(dump.split("-")[2])
+    dump_issue = int(dump.split("-")[3])
+    if dump_month > 2024 or (dump_month == 2024 and dump_issue > 18):
+        cfg.overwrite_with_none = True
 
     main_output_path = output_path.rstrip("/") + "-main/"
     main_dump_output_path = main_output_path + dump + "/"
@@ -33,7 +42,7 @@ def main(
         logging_dir=str(PROJECT_ROOT / "logs" / "main-logs" / dump),
         randomize_start_duration=cfg.randomize_start_duration,
     )
-    
+
     # Do containment checking (separately because it's intensive on storage)
     dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
     containment_pipeline = build_containment_pipeline(
@@ -41,6 +50,7 @@ def main(
         ignore_duckdb_for=cfg.ignore_duckdb_for,
         input_path=main_dump_output_path,
         output_path=dump_output_path,
+        overwrite_with_none=cfg.overwrite_with_none,
     )
     containment_executor = LocalPipelineExecutor(
         pipeline=containment_pipeline,
@@ -51,6 +61,7 @@ def main(
     )
 
     containment_executor.run()
+
 
 if __name__ == "__main__":
     import argparse

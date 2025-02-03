@@ -50,6 +50,7 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
 - license_disagreement: whether the `potential_licenses["abbr"]` disagree, i.e., different types of licenses were found. License *versions* are not included in the comparison!
 - language: the language, as detected by fastText `ft176`
 - language_score: the language identification confidence score
+- found_in_fw2: whether this sample was found in FineWeb-2. Crawls that are more recent than FW2 (everything after 2024-18) is marked as None
 
 ## Installation
 
@@ -84,13 +85,15 @@ Now you can submit the job to start processing a specific crawl, e.g.
 sbatch launch.slurm CC-MAIN-2024-51
 ```
 
+Output of the first step will be saved, by default, in `output/` and the final data (added column whether the sample exists in FineWeb-2) 
+
 ## Progress
 
 @ https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons
 
 ### Done
 
-
+- 
 
 ### Running
 

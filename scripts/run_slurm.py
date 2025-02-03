@@ -2,7 +2,13 @@ from pathlib import Path
 
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
-from commoncrawl_cc_annotation.script_utils import SlurmConfig, build_main_pipeline, build_containment_pipeline, job_id_retriever
+
+from commoncrawl_cc_annotation.script_utils import (
+    SlurmConfig,
+    build_containment_pipeline,
+    build_main_pipeline,
+    job_id_retriever,
+)
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
 
 
@@ -18,6 +24,14 @@ def main(
     config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
     sbatch_args = {"account": account} if account else {}
     cfg = SlurmConfig(**config)
+
+    # If dump is more recent than 2024-18, we auto-set the found_in_fw2
+    # column to False because FW2 does not have that data. That avoids the expensive
+    # containment checking.
+    dump_month = int(dump.split("-")[2])
+    dump_issue = int(dump.split("-")[3])
+    if dump_month > 2024 or (dump_month == 2024 and dump_issue > 18):
+        cfg.overwrite_with_none = True
 
     main_output_path = output_path.rstrip("/") + "-main/"
     main_dump_output_path = main_output_path + dump + "/"
@@ -53,6 +67,7 @@ def main(
         ignore_duckdb_for=cfg.ignore_duckdb_for,
         input_path=main_dump_output_path,
         output_path=dump_output_path,
+        overwrite_with_none=cfg.overwrite_with_none,
     )
     containment_executor = SlurmPipelineExecutor(
         pipeline=containment_pipeline,
@@ -73,7 +88,6 @@ def main(
     )
 
     containment_executor.run()
-
 
 
 if __name__ == "__main__":

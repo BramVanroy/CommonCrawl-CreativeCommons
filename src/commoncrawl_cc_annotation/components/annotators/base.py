@@ -86,4 +86,3 @@ class BaseBatchAnnotator(BaseAnnotator):
         if batch:
             with self.track_time():
                 yield from self.annotate(batch)
-

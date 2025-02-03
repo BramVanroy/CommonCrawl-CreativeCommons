@@ -28,6 +28,7 @@ LANGUAGES = [
     "spa_Latn",
 ]
 
+
 class BaseUploadConfig(BaseModel):
     """Base Config class for local and Slurm configurations"""
 
@@ -36,12 +37,14 @@ class BaseUploadConfig(BaseModel):
     randomize_start_duration: int = 0
     limit: int = -1
 
+
 class SlurmUploadConfig(BaseUploadConfig):
     """Slurm configuration for running the pipeline on a cluster"""
 
     time: str
     mem_per_cpu_gb: int = 2
     cpus_per_task: int = 1
+
 
 class BaseConfig(BaseModel):
     """Base Config class for local and Slurm configurations"""
@@ -55,6 +58,7 @@ class BaseConfig(BaseModel):
     language_threshold: float = 0.65
     languages: list = LANGUAGES
     duckdb_templ_path: str | None = None
+    overwrite_with_none: bool = False
     ignore_duckdb_for: list[str] = ["eng_Latn"]
     limit: int = -1
 
@@ -112,18 +116,20 @@ def build_main_pipeline(
         SymbolLinesFormatter(symbols_to_remove=["|"], replace_char="\n"),  # fix trafilatura table artifacts
         JsonlWriter(
             output_folder=f"{output_path}/",
-        )
+        ),
     ]
+
 
 def build_containment_pipeline(
     input_path: str,
     duckdb_templ_path: str,
     ignore_duckdb_for: list[str],
     output_path: str,
+    overwrite_with_none: bool = False,
 ) -> list[PipelineStep]:
     """
     Build a pipeline for annotating the web pages with the database containment information.
-    
+
     Args:
         duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
         Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
@@ -131,6 +137,9 @@ def build_containment_pipeline(
         ignore_duckdb_for (list[str]): List of languages to ignore when querying the DuckDB databases. For
         these languages, the 'found' field will be set to `None`.
         output_path (str): Path to use for the input reading as well as output writing.
+        overwrite_with_none (bool, optional): If True, the 'found' field will be set to `None` for all documents,
+        regardless of the language. Useful if you know that a given dump does not occur in the other database.
+        This improves speed as the database is not queried. Defaults to False.
     """
     if not duckdb_templ_path or "{language}" not in duckdb_templ_path:
         raise ValueError("The duckdb_templ_path must contain the placeholder '{language}'")
@@ -144,12 +153,13 @@ def build_containment_pipeline(
             duckdb_templ_path=duckdb_templ_path,
             ignore_duckdb_for=ignore_duckdb_for,
             added_key="found_in_fw2",
-        ),        
+            overwrite_with_none=overwrite_with_none,
+        ),
         JsonlWriter(
             output_folder=f"{output_path}/",
             output_filename="${language}_${language_script}/${rank}.jsonl.gz",
             expand_metadata=True,
-        )
+        ),
     ]
 
 
@@ -186,6 +196,7 @@ SCHEMA = pa.schema(
         pa.field("found_in_fw2", pa.bool_(), nullable=True),
     ]
 )
+
 
 def job_id_retriever(job_id: str) -> str:
     return re.search(r"Submitted batch job (\d+)", job_id).group(1)

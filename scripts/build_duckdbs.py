@@ -4,9 +4,10 @@ from time import sleep
 from typing import Callable
 
 import duckdb
-from datasets import DatasetDict, IterableDatasetDict, concatenate_datasets, load_dataset, get_dataset_config_names
-from huggingface_hub import upload_file, list_repo_files
+from datasets import DatasetDict, IterableDatasetDict, concatenate_datasets, get_dataset_config_names, load_dataset
+from huggingface_hub import list_repo_files, upload_file
 from huggingface_hub.errors import HfHubHTTPError
+
 from commoncrawl_cc_annotation.utils import extract_uuid
 
 
@@ -98,9 +99,9 @@ def dataset_to_duckdb(
 
         if row_count == 0:
             raise ValueError(f"No rows were inserted into the DuckDB database at {duckdb_path}")
-        
+
         print(f"The table in {farrow} has {row_count:,} rows.")
-    
+
     os.remove(farrow)
 
     return duckdb_path
@@ -113,13 +114,13 @@ def fw2_prep_func(sample: dict):
 
 
 KEEP_LOCAL = [
-        "fry_Latn",
-        "afr_Latn",
-        "ita_Latn",
-        "nld_Latn",
-        "spa_Latn",
-        "fra_Latn",
-        "deu_Latn",
+    "fry_Latn",
+    "afr_Latn",
+    "ita_Latn",
+    "nld_Latn",
+    "spa_Latn",
+    "fra_Latn",
+    "deu_Latn",
 ]
 
 
