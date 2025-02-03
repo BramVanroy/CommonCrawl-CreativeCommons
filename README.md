@@ -108,3 +108,10 @@ Output of the first step will be saved, by default, in `output/` and the final d
 - CC-MAIN-2022-05
 - CC-MAIN-2023-06
 - CC-MAIN-2024-51
+
+## Acknowledgments
+
+- [TNO](https://www.tno.nl/nl/), who funded the work hours to accomplish this code. They intend to use (parts of) [the generated material](https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons) for the [GPT-NL project](https://gpt-nl.nl/).
+- [Flemish Supercomputer Center](https://www.vscentrum.be/) for part of the compute under grant 2024-107
+- Guilherme Penedo ([@guipenedo](https://huggingface.co/guipenedo)) and the rest of the [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb) and [datatrove](https://github.com/huggingface/datatrove) team for the help and insights
+- ML6 and specifically Robin Van Craenenbroek for their [Fondant Creative Commons](https://github.com/ml6team/fondant-usecase-filter-creative-commons/tree/add-fondant-usecase-cc-image-extraction) filter for image datasets. While my approach is different, their code did serve as inspiration.
