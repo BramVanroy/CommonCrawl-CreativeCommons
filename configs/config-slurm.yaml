@@ -1,0 +1,12 @@
+main_tasks: 8000
+randomize_start_duration: 1200
+main_time: "3-00:00:00"
+main_mem_per_cpu_gb: 4
+main_cpus_per_task: 1
+main_workers: -1
+
+containment_tasks: 1000
+containment_mem_per_cpu_gb: 6
+containment_cpus_per_task: 10
+containment_workers: 24
+duckdb_templ_path: <YOUR-ROOT-DIR>/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{language}.duckdb

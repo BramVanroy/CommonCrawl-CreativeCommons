@@ -1,0 +1,4 @@
+tasks: 25
+time: "1-00:00:00"
+mem_per_cpu_gb: 4
+cpus_per_task: 2
