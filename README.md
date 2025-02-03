@@ -21,7 +21,7 @@ languages:
 The following fields are extracted:
 
 In some cases, multiple licenses are found on a single page. All licenses are collected in `potential_licenses`. From these, the "best guess" is selected
-based on three criteria:
+based on three criteria. All licenses are sorted based on these properties and the first one is detected. E.g. licenses in the meta tag are preferred over an `a` tag, or (location equal) a license in the `head` or footer has preference over one in the body.
 
 1. location_preference_order: meta_tag, json-ld, link_tag, a_tag
 2. head_preference_order: True, False
