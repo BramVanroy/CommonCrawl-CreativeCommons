@@ -51,6 +51,14 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
 - language: the language, as detected by fastText `ft176`
 - language_score: the language identification confidence score
 
+## Installation
+
+Simply pip install this repository. E.g., for an editable install:
+
+```shell
+python -m pip install -e .
+```
+
 ## Usage
 
 While `local` alternatives are given for running the pipeline on your local machine, the recommended use is via SLURM through `scripts/run_slurm.py`. Usage is facilitated via the SLURM launch scripts in `slurm/launch.slurm`. To use the scripts, you do need to take care of some things:
