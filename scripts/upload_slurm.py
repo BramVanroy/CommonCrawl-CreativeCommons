@@ -51,9 +51,9 @@ if __name__ == "__main__":
 
     cparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     cparser.add_argument(
-        "-j", "--jsonl_path", type=str, required=True, help="Path to the directory containing the JSONL files"
+        "-j", "--jsonl_path", type=str, required=True, help="Path to the directory containing the JSONL files, most top-level, e.g. `output/`"
     )
-    cparser.add_argument("-o", "--output_path", type=str, required=True, help="Output path")
+    cparser.add_argument("-o", "--output_path", type=str, required=True, help="Output path to save the parquet files before uploading")
     cparser.add_argument("-r", "--hf_repo", type=str, required=True, help="Hugging Face repository name")
     cparser.add_argument("--partition", type=str, required=True, help="Slurm partition")
     cparser.add_argument("--pipelines_config", type=str, required=True, help="Path to the pipelines YAML config file")
