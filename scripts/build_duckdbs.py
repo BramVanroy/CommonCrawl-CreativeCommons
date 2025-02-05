@@ -4,11 +4,21 @@ from time import sleep
 from typing import Callable
 
 import duckdb
-from datasets import DatasetDict, IterableDatasetDict, concatenate_datasets, get_dataset_config_names, load_dataset
+from datasets import (
+    DatasetDict,
+    IterableDatasetDict,
+    concatenate_datasets,
+    disable_caching,
+    get_dataset_config_names,
+    load_dataset,
+)
 from huggingface_hub import list_repo_files, upload_file
 from huggingface_hub.errors import HfHubHTTPError
 
 from commoncrawl_cc_annotation.utils import extract_uuid
+
+# Disable chacing to save space
+disable_caching()
 
 
 def dataset_to_duckdb(
@@ -58,7 +68,7 @@ def dataset_to_duckdb(
             # Only works when the origin files are parquet.
             columns=["dump", "id"],
         )
-    except TypeError:
+    except (TypeError, ValueError):
         ds = load_dataset(
             dataset_name,
             dataset_config,
@@ -170,6 +180,8 @@ def build_all_fw2_dbs(overwrite: bool = False):
 
             if lang not in KEEP_LOCAL:
                 os.remove(local_duckdb_path)
+
+            sleep(30)
 
 
 if __name__ == "__main__":

@@ -98,12 +98,10 @@ Output of the first step will be saved, by default, in `output/` and the final d
 ### Running
 
 - CC-MAIN-2019-30
+- CC-MAIN-2020-05
 
 ### To do
 
-
-- CC-MAIN-2019-30
-- CC-MAIN-2020-05
 - CC-MAIN-2021-04
 - CC-MAIN-2022-05
 - CC-MAIN-2023-06
