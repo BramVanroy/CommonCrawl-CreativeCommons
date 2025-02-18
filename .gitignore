@@ -6,6 +6,8 @@ tmp/
 duckdbs/
 parquet_output/
 log.out
+configs/*
+!configs/example-*
 
 downloaded_warc_file.warc.gz
 extracted.html

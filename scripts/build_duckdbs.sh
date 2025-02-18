@@ -12,6 +12,6 @@ while true; do
         break
     else
         echo "Script crashed with exit code $EXIT_CODE. Restarting after sleeping 15m..."
-        sleep -m 15
+        sleep 15m
     fi
 done

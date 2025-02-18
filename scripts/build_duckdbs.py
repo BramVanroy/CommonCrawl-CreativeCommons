@@ -17,6 +17,7 @@ from huggingface_hub.errors import HfHubHTTPError
 
 from commoncrawl_cc_annotation.utils import extract_uuid
 
+
 # Disable chacing to save space
 disable_caching()
 
@@ -30,7 +31,7 @@ def dataset_to_duckdb(
     streaming: bool = False,
     num_loaders: int = 1,
     num_workers: int = 1,
-) -> str:
+) -> bool:
     """
     Load a HuggingFace dataset and save one of its columns as a parquet file so that we can use it to
     build a DuckDB database from.
@@ -45,6 +46,9 @@ def dataset_to_duckdb(
         num_loaders: The number of parallel loaders to use. Only used when column is `id`.
         num_workers: The number of parallel workers to use when applying the unique_column_func if it is a Callable
         only_load_columns: The columns to load from the dataset. Can improve the download time by only downloading these columns
+
+    Returns:
+        Whether the DuckDB file was successfully built
     """
     if streaming:
         raise NotImplementedError("Streaming is not yet supported")
@@ -69,12 +73,16 @@ def dataset_to_duckdb(
             columns=["dump", "id"],
         )
     except (TypeError, ValueError):
-        ds = load_dataset(
-            dataset_name,
-            dataset_config,
-            streaming=streaming,
-            num_proc=num_loaders if not streaming else None,
-        )
+        try:
+            ds = load_dataset(
+                dataset_name,
+                dataset_config,
+                streaming=streaming,
+                num_proc=num_loaders if not streaming else None,
+            )
+        except Exception:
+            print(f"Failed to load dataset {dataset_name} with config {dataset_config}")
+            return False
 
     if isinstance(ds, DatasetDict) or isinstance(ds, IterableDatasetDict):
         ds = concatenate_datasets([ds[split] for split in list(ds.keys())])
@@ -114,7 +122,7 @@ def dataset_to_duckdb(
 
     os.remove(farrow)
 
-    return duckdb_path
+    return True
 
 
 def fw2_prep_func(sample: dict):
@@ -139,6 +147,7 @@ def build_all_fw2_dbs(overwrite: bool = False):
     config_names = [cfg for cfg in get_dataset_config_names(dataset_name) if "removed" not in cfg]
     existing_files_in_repo = list_repo_files(repo_id="BramVanroy/fineweb-2-duckdbs", repo_type="dataset")
 
+    language_success = {}
     for lang in config_names:
         local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{lang}.duckdb"
         path_in_repo = Path(local_duckdb_path).name
@@ -146,7 +155,7 @@ def build_all_fw2_dbs(overwrite: bool = False):
 
         if overwrite or (not os.path.isfile(local_duckdb_path) and not exists_in_repo):
             print(f"Buidling DuckDB for {lang}")
-            dataset_to_duckdb(
+            lang_success = dataset_to_duckdb(
                 "HuggingFaceFW/fineweb-2",
                 local_duckdb_path,
                 # For fineweb we still have to extract the UUID from the `id` column
@@ -157,6 +166,9 @@ def build_all_fw2_dbs(overwrite: bool = False):
                 num_loaders=None,
                 num_workers=64,
             )
+            language_success[lang] = lang_success
+        else:
+            language_success[lang] = True
 
         if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
             print(f"Uploading {local_duckdb_path}")
@@ -182,6 +194,11 @@ def build_all_fw2_dbs(overwrite: bool = False):
                 os.remove(local_duckdb_path)
 
             sleep(30)
+
+    print("Failed languages:")
+    for lang, success in language_success.items():
+        if not success:
+            print(f"- {lang}")
 
 
 if __name__ == "__main__":
