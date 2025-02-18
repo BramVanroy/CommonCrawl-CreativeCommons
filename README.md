@@ -112,12 +112,14 @@ Output of the first step will be saved, by default, in `output/` and the final d
 If you use this library or data that was created with it, please cite:
 
 ```bibtex
-@software{vanroy2025commoncrawlcreativecommons,
-  author = {Bram Vanroy},
-  title = {{CommonCrawl-CreativeCommons: Filtering Common Crawl on Creative Commons licenses}},
+@software{Vanroy_CommonCrawl-CreativeCommons_2025,
+  author = {Vanroy, Bram},
+  license = {GPL-3.0},
+  month = feb,
+  title = {{CommonCrawl-CreativeCommons}},
   url = {https://github.com/BramVanroy/CommonCrawl-CreativeCommons},
   version = {1.1.0},
-  date = {2025-02-03},
+  year = {2025}
 }
 ```
 
