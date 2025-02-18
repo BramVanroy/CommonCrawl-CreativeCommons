@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "CommonCrawl-CreativeCommons"
+version: "1.1.0"
+authors:
+  - family-names: "Vanroy"
+    given-names: "Bram"
+    orcid: "https://orcid.org/0000-0002-4622-8364"
+date-released: "2025-02-03"
+url: "https://github.com/BramVanroy/CommonCrawl-CreativeCommons"
+repository-code: "https://github.com/BramVanroy/CommonCrawl-CreativeCommons"
+license: "GPL-3.0"
