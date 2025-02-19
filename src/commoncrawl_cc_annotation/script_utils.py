@@ -165,35 +165,35 @@ def build_containment_pipeline(
 
 SCHEMA = pa.schema(
     [
-        pa.field("text", pa.string()),
-        pa.field("id", pa.string()),
-        pa.field("dump", pa.string()),
-        pa.field("url", pa.string()),
-        pa.field("date", pa.string()),
-        pa.field("file_path", pa.string()),
-        pa.field("license_abbr", pa.string()),
-        pa.field("license_version", pa.string()),
-        pa.field("license_location", pa.string()),
-        pa.field("license_in_head", pa.bool_()),
-        pa.field("license_in_footer", pa.bool_()),
+        pa.field("text", pa.string(), nullable=False),
+        pa.field("id", pa.string(), nullable=False),
+        pa.field("dump", pa.string(), nullable=False),
+        pa.field("url", pa.string(), nullable=False),
+        pa.field("date", pa.string(), nullable=False),
+        pa.field("file_path", pa.string(), nullable=False),
+        pa.field("license_abbr", pa.string(), nullable=False),
+        pa.field("license_version", pa.string(), nullable=True),
+        pa.field("license_location", pa.string(), nullable=False),
+        pa.field("license_in_head", pa.bool_(), nullable=False),
+        pa.field("license_in_footer", pa.bool_(), nullable=False),
         pa.field(
             "potential_licenses",
             pa.struct(
                 [
-                    pa.field("abbr", pa.list_(pa.string())),
-                    pa.field("in_footer", pa.list_(pa.bool_())),
-                    pa.field("in_head", pa.list_(pa.bool_())),
-                    pa.field("location", pa.list_(pa.string())),
-                    pa.field("version", pa.list_(pa.string())),
+                    pa.field("abbr", pa.list_(pa.string()), nullable=False),
+                    pa.field("in_footer", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("in_head", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("location", pa.list_(pa.string()), nullable=False),
+                    pa.field("version", pa.list_(pa.string()), nullable=False),
                 ]
             ),
         ),
-        pa.field("license_parse_error", pa.bool_()),
-        pa.field("license_disagreement", pa.bool_()),
-        pa.field("language_script", pa.string()),
-        pa.field("language", pa.string()),
-        pa.field("language_score", pa.float64()),
-        pa.field("found_in_fw2", pa.bool_()),
+        pa.field("license_parse_error", pa.bool_(), nullable=False),
+        pa.field("license_disagreement", pa.bool_(), nullable=False),
+        pa.field("language_script", pa.string(), nullable=False),
+        pa.field("language", pa.string(), nullable=False),
+        pa.field("language_score", pa.float64(), nullable=False),
+        pa.field("found_in_fw2", pa.bool_(), nullable=True),
     ]
 )
 
