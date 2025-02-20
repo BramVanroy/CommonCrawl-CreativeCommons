@@ -16,6 +16,10 @@ def main(
     venv_path: str | None = None,
     account: str | None = None,
 ):
+    if Path(jsonl_path).stem != Path(output_path).stem:
+        raise ValueError("JSONL path and output path must both end in the same dump name.")
+
+    crawl_name = Path(output_path).stem
     print_system_stats()
     config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
     sbatch_args = {"account": account} if account else {}
@@ -27,8 +31,8 @@ def main(
         hf_repo=hf_repo,
         limit=cfg.limit,
     )
-    log_dir = str(PROJECT_ROOT / "logs" / "upload-logs")
-    slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / "upload-logs")
+    log_dir = str(PROJECT_ROOT / "logs" / "upload-logs" / crawl_name)
+    slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / "upload-logs" / crawl_name)
     SlurmPipelineExecutor(
         pipeline=pipeline,
         job_id_retriever=job_id_retriever,
@@ -55,10 +59,14 @@ if __name__ == "__main__":
         "--jsonl_path",
         type=str,
         required=True,
-        help="Path to the directory containing the JSONL files, most top-level, e.g. `output/`",
+        help="Path to the directory containing the JSONL files from processing a single dump, most top-level, e.g. `output/CC-MAIN-2019-30`. Must end in dump name.",
     )
     cparser.add_argument(
-        "-o", "--output_path", type=str, required=True, help="Output path to save the parquet files before uploading"
+        "-o",
+        "--output_path",
+        type=str,
+        required=True,
+        help="Output path to save the parquet files before uploading, e.g. `parquet_output/CC-MAIN-2019-30`. Must end in dump name.",
     )
     cparser.add_argument("-r", "--hf_repo", type=str, required=True, help="Hugging Face repository name")
     cparser.add_argument("--partition", type=str, required=True, help="Slurm partition")
