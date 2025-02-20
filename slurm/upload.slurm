@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=3-00:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --partition=<ADD-YOUR-PARTITION>
 #SBATCH --account=<ADD-YOUR-ACCOUNT>
 #SBATCH --ntasks=1
@@ -25,8 +25,8 @@ if ! git pull | grep -q "Already up to date."; then
 fi
 
 python scripts/upload_slurm.py \
-  -j output/ \
-  -o parquet_output \
+  -j output/CC-MAIN-2020-05 \
+  -o parquet_output/CC-MAIN-2020-05 \
   -r "$REPO_NAME" \
   --pipelines_config "$BASE_PATH/configs/upload-config-slurm.yaml" \
   --venv_path "$BASE_PATH/.venv/bin/activate" \
