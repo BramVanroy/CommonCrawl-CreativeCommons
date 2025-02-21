@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import BaseConfig, build_containment_pipeline, build_main_pipeline
+from commoncrawl_cc_annotation.script_utils import BaseConfig, auto_download_duckdbs, build_containment_pipeline, build_main_pipeline
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
@@ -18,13 +18,34 @@ def main(
         config = {}
     cfg = BaseConfig(**config)
 
-    # If dump is more recent than 2024-18, we auto-set the found_in_fw2
+    # If dump is more recent than 2024-18, we auto-set the found_in_fw
     # column to False because FW2 does not have that data. That avoids the expensive
     # containment checking.
-    dump_month = int(dump.split("-")[2])
+    dump_year = int(dump.split("-")[2])
     dump_issue = int(dump.split("-")[3])
-    if dump_month > 2024 or (dump_month == 2024 and dump_issue > 18):
-        cfg.overwrite_with_none = True
+
+    # Not in FineWeb-2
+    ignore_duckdb_for = cfg.ignore_duckdb_for or []
+    if dump_year > 2024 or (dump_year == 2024 and dump_issue > 18):
+        ignore_duckdb_for += cfg.languages
+    
+    # FW1 v1.3 contains data up to 2024-51
+    if dump_year > 2024 or (dump_year == 2024 and dump_issue > 51):
+        ignore_duckdb_for += "eng_Latn"
+    
+    if "{language}" not in cfg.fw2_duckdb_templ_path:
+        raise ValueError("The fw2_duckdb_templ_path must contain the string '{language}'")
+    
+    if "{dump}" not in cfg.fw_duckdb_templ_path:
+        raise ValueError("The fw_duckdb_templ_path must contain the string '{dump}'")
+    
+    fw_duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
+
+    auto_download_duckdbs(
+        languages=cfg.languages,
+        fw2_duckdb_templ_path=cfg.fw2_duckdb_templ_path,
+        fw_duckdb_path=fw_duckdb_path,
+    )
 
     main_output_path = output_path.rstrip("/") + "-main/"
     main_dump_output_path = main_output_path + dump + "/"
@@ -46,7 +67,8 @@ def main(
     # Do containment checking (separately because it's intensive on storage)
     dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
     containment_pipeline = build_containment_pipeline(
-        duckdb_templ_path=cfg.duckdb_templ_path,
+        fw_duckdb_path=fw_duckdb_path,
+        fw2_duckdb_templ_path=cfg.fw2_duckdb_templ_path,
         ignore_duckdb_for=cfg.ignore_duckdb_for,
         input_path=main_dump_output_path,
         output_path=dump_output_path,

@@ -8,6 +8,7 @@ parquet_output/
 log.out
 configs/*
 !configs/example-*
+fix_eng_tmp/
 
 downloaded_warc_file.warc.gz
 extracted.html

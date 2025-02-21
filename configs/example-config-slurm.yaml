@@ -9,4 +9,5 @@ containment_tasks: 1000
 containment_mem_per_cpu_gb: 6
 containment_cpus_per_task: 10
 containment_workers: 24
-duckdb_templ_path: <YOUR-ROOT-DIR>/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{language}.duckdb
+fw2_duckdb_templ_path: <YOUR-ROOT-DIR>/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{language}.duckdb
+fw_duckdb_templ_path: <YOUR-ROOT-DIR>/CommonCrawl-CreativeCommons/duckdbs/fineweb/fw-{dump}.duckdb

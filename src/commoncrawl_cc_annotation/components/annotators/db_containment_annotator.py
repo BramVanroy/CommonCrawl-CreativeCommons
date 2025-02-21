@@ -7,27 +7,32 @@ from ...utils import extract_uuid
 from .base import BaseBatchAnnotator
 
 
-class DatabaseContainmentAnnotator(BaseBatchAnnotator):
-    name = "🗄️ Database Containment Annotator"
+class FWDatabaseContainmentAnnotator(BaseBatchAnnotator):
+    name = "🗄️ FW Database Containment Annotator"
 
     _requires_dependencies = ["duckdb"]
 
     def __init__(
         self,
-        duckdb_templ_path: str | None,
+        fw_duckdb_path: str | None,
+        fw2_duckdb_templ_path: str | None,
         added_key: str,
-        ignore_duckdb_for: list[str],
+        ignore_duckdb_for: list[str] | None = None,
+        fw_eng_tag: str = "eng_Latn",  # Depends on the language detector
         batch_size: int = 128,
         overwrite_with_none: bool = False,
     ):
         super().__init__(batch_size=batch_size)
 
         if not overwrite_with_none:
-            if not duckdb_templ_path or "{language}" not in duckdb_templ_path:
-                raise ValueError("The duckdb_templ_path must contain the placeholder '{language}'")
-        self.duckdb_template = duckdb_templ_path
+            if not fw2_duckdb_templ_path or "{language}" not in fw2_duckdb_templ_path:
+                raise ValueError("The fw2_duckdb_templ_path must contain the placeholder '{language}'")
+        self.fw_duckdb_path = fw_duckdb_path
+        self.fw2_duckdb_templ_path = fw2_duckdb_templ_path
         self.added_key = added_key
-        self.ignore_duckdb_for = ignore_duckdb_for
+        self.ignore_duckdb_for = ignore_duckdb_for or []
+        self.fw_eng_tag = fw_eng_tag
+
         self.cons = {}
         self.overwrite_with_none = overwrite_with_none
 
@@ -58,22 +63,38 @@ class DatabaseContainmentAnnotator(BaseBatchAnnotator):
 
                 # Open connection to DuckDB database for this language
                 if full_lang not in self.cons:
-                    duckdb_path = self.duckdb_template.format(language=full_lang)
+                    if full_lang == self.fw_eng_tag:
+                        duckdb_path = self.fw_duckdb_path
+                    else:
+                        duckdb_path = self.fw2_duckdb_templ_path.format(language=full_lang)
                     con = duckdb.connect(duckdb_path, read_only=True)
                     self.cons[full_lang] = con
 
                 con = self.cons[full_lang]
-
+                
                 # Batch query: check multiple UUIDs at once
-                uuids = [(doc.metadata["dump"], extract_uuid(doc.id)) for doc in doc_group]
-                placeholders = ", ".join(["(?, ?)"] * len(uuids))
-                query = f"""
-                    SELECT CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END AS exists
-                    FROM (VALUES {placeholders}) AS v(dump, id)
-                    LEFT JOIN data d
-                    ON v.dump = d.dump AND v.id = d.id;
-                """
-                results = con.execute(query, [value for pair in uuids for value in pair]).fetchall()
+                # FineWeb (English) only has the `id` column to test for existence
+                if full_lang == self.fw_eng_tag:
+                    uuids = [extract_uuid(doc.id) for doc in doc_group]
+                    placeholders = ", ".join(["(?)"] * len(uuids))
+                    query = f"""
+                        SELECT CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END AS exists
+                        FROM (VALUES {placeholders}) AS v(id)
+                        LEFT JOIN data d
+                        ON v.id = d.id;
+                    """
+                    results = con.execute(query, uuids).fetchall()
+                else:
+                    uuids = [(doc.metadata["dump"], extract_uuid(doc.id)) for doc in doc_group]
+                    placeholders = ", ".join(["(?, ?)"] * len(uuids))
+                    query = f"""
+                        SELECT CASE WHEN d.id IS NOT NULL THEN 1 ELSE 0 END AS exists
+                        FROM (VALUES {placeholders}) AS v(dump, id)
+                        LEFT JOIN data d
+                        ON v.dump = d.dump AND v.id = d.id;
+                    """
+                    results = con.execute(query, [value for pair in uuids for value in pair]).fetchall()
+                
                 results = [bool(r[0]) for r in results]
 
                 # Update documents with results

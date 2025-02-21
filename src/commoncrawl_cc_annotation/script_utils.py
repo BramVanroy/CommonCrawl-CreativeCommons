@@ -1,3 +1,4 @@
+from pathlib import Path
 import re
 
 import pyarrow as pa
@@ -12,9 +13,9 @@ from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from pydantic import BaseModel
 
-from .components.annotators import DatabaseContainmentAnnotator, LicenseAnnotator
+from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter
-
+from huggingface_hub import hf_hub_download
 
 # Afrikaans, German, English, French, Frisian, Italian, Dutch, Spanish
 LANGUAGES = [
@@ -57,9 +58,10 @@ class BaseConfig(BaseModel):
     randomize_start_duration: int = 0
     language_threshold: float = 0.65
     languages: list = LANGUAGES
-    duckdb_templ_path: str | None = None
+    fw_duckdb_templ_path: str | None = None
+    fw2_duckdb_templ_path: str | None = None
     overwrite_with_none: bool = False
-    ignore_duckdb_for: list[str] = ["eng_Latn"]
+    ignore_duckdb_for: list[str] | None = None
     limit: int = -1
 
 
@@ -121,8 +123,9 @@ def build_main_pipeline(
 
 
 def build_containment_pipeline(
-    input_path: str,
-    duckdb_templ_path: str,
+    input_path: str,    
+    fw_duckdb_path: str,
+    fw2_duckdb_templ_path: str,
     ignore_duckdb_for: list[str],
     output_path: str,
     overwrite_with_none: bool = False,
@@ -131,7 +134,8 @@ def build_containment_pipeline(
     Build a pipeline for annotating the web pages with the database containment information.
 
     Args:
-        duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
+        fw_duckdb_path: Path to the FineWeb DuckDB database (English).
+        fw2_duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
         Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
         as found in the concatenation of `{metadata["language"]}_{metadata["language_script"]}`.
         ignore_duckdb_for (list[str]): List of languages to ignore when querying the DuckDB databases. For
@@ -141,18 +145,19 @@ def build_containment_pipeline(
         regardless of the language. Useful if you know that a given dump does not occur in the other database.
         This improves speed as the database is not queried. Defaults to False.
     """
-    if not duckdb_templ_path or "{language}" not in duckdb_templ_path:
-        raise ValueError("The duckdb_templ_path must contain the placeholder '{language}'")
+    if not fw2_duckdb_templ_path or "{language}" not in fw2_duckdb_templ_path:
+        raise ValueError("The fw2_duckdb_templ_path must contain the placeholder '{language}'")
 
     return [
         JsonlReader(
             data_folder=input_path,
             glob_pattern="**/*.jsonl.gz",
         ),
-        DatabaseContainmentAnnotator(
-            duckdb_templ_path=duckdb_templ_path,
+        FWDatabaseContainmentAnnotator(
+            fw_duckdb_path=fw_duckdb_path,
+            fw2_duckdb_templ_path=fw2_duckdb_templ_path,
             ignore_duckdb_for=ignore_duckdb_for,
-            added_key="found_in_fw2",
+            added_key="found_in_fw",
             overwrite_with_none=overwrite_with_none,
         ),
         JsonlWriter(
@@ -193,7 +198,7 @@ SCHEMA = pa.schema(
         pa.field("language_script", pa.string(), nullable=False),
         pa.field("language", pa.string(), nullable=False),
         pa.field("language_score", pa.float64(), nullable=False),
-        pa.field("found_in_fw2", pa.bool_(), nullable=True),
+        pa.field("found_in_fw", pa.bool_(), nullable=True),
     ]
 )
 
@@ -219,3 +224,16 @@ def build_upload_pipeline(jsonl_path: str, output_path: str, hf_repo: str, limit
             cleanup=True,
         ),
     ]
+
+
+def auto_download_duckdbs(languages: list[str], fw2_duckdb_templ_path: str, fw_duckdb_path: str):
+    pfw = Path(fw_duckdb_path)
+    for lang in languages:
+        if lang == "eng_Latn":            
+            if not pfw.exists() or pfw.stat().st_size == 0:
+                hf_hub_download(repo_id="BramVanroy/fineweb-duckdbs", filename=pfw.name, local_dir=pfw.parent, repo_type="dataset")
+        else:
+            local_path = fw2_duckdb_templ_path.format(language=lang)
+            pf = Path(local_path)
+            if not pf.exists() or pf.stat().st_size == 0:
+                hf_hub_download(repo_id="BramVanroy/fineweb-2-duckdbs", filename=pf.name, local_dir=pf.parent, repo_type="dataset")

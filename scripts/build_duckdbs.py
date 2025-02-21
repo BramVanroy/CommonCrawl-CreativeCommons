@@ -232,7 +232,7 @@ def build_fw_dbs(overwrite: bool = False):
 
     existing_files_in_repo = list_repo_files(repo_id="BramVanroy/fineweb-duckdbs", repo_type="dataset")
 
-    dump_success = {}
+    dump_success_result = {}
     for dump in dump_names:
         local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb/fw-{dump}.duckdb"
         path_in_repo = Path(local_duckdb_path).name
@@ -253,9 +253,9 @@ def build_fw_dbs(overwrite: bool = False):
                 cache_dir=f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw/{dump}",
                 clear_cache_dir=True,
             )
-            dump_success[dump] = dump_success
+            dump_success_result[dump] = dump_success
         else:
-            dump_success[dump] = True
+            dump_success_result[dump] = True
 
         if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
             print(f"Uploading {local_duckdb_path}")
@@ -283,7 +283,7 @@ def build_fw_dbs(overwrite: bool = False):
             sleep(30)
 
     print("Failed languages:")
-    for dump, success in dump_success.items():
+    for dump, success in dump_success_result.items():
         if not success:
             print(f"- {dump}")
 

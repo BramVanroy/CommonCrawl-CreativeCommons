@@ -51,7 +51,7 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
 - language_script: the script of the language as detected by `glotlid`
 - language: the language, as detected by `glotlid`
 - language_score: the language identification confidence score
-- found_in_fw2: whether this sample was found in FineWeb-2 based on the. Crawls that are more recent than FW2 (everything after 2024-18) are marked as None. English crawl is also marked as None!
+- found_in_fw: whether this sample was found in FineWeb-2 based on the. Crawls that are more recent than FW2 (everything after 2024-18) are marked as None. English crawl is also marked as None!
 
 ## Installation
 
