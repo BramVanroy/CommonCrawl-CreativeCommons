@@ -35,7 +35,7 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
 - url: original url for document
 - date: crawl date
 - file_path: file path on the S3 bucket
-- license_abbr: the license type. Possible values: "cc-unknown" (recommended to filter this one out), "by", "by-sa", "by-nd", "by-nc", "by-nc-sa", "by-nc-nd", "zero", "certification", "mark". If multiple licenses were found (`potential_licenses`) 
+- license_abbr: the license type. Possible values: "cc-unknown" (recommended to filter this one out), "by", "by-sa", "by-nd", "by-nc", "by-nc-sa", "by-nc-nd", "zero", "certification", "mark". If multiple licenses were found, `potential_licenses` contains all of them.
 - license_version: the license version, e.g. "4.0"
 - license_location: the location where the license was found. Possible values: "meta_tag", "json-ld", "link_tag", "a_tag"
 - license_in_head: whether the license was found inside a `head` HTML element
@@ -48,9 +48,10 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
   - in_footer: list of whether licenses were found in a footer
 - license_parse_error: whether there was a problem when trying to extract the license, e.g. an unparseable HTML document
 - license_disagreement: whether the `potential_licenses["abbr"]` disagree, i.e., different types of licenses were found. License *versions* are not included in the comparison!
-- language: the language, as detected by fastText `ft176`
+- language_script: the script of the language as detected by `glotlid`
+- language: the language, as detected by `glotlid`
 - language_score: the language identification confidence score
-- found_in_fw2: whether this sample was found in FineWeb-2. Crawls that are more recent than FW2 (everything after 2024-18) is marked as None
+- found_in_fw2: whether this sample was found in FineWeb-2 based on the. Crawls that are more recent than FW2 (everything after 2024-18) are marked as None. English crawl is also marked as None!
 
 ## Installation
 
@@ -85,27 +86,12 @@ Now you can submit the job to start processing a specific crawl, e.g.
 sbatch launch.slurm CC-MAIN-2024-51
 ```
 
-Output of the first step will be saved, by default, in `output/` and the final data (added column whether the sample exists in FineWeb-2) 
+Output of the first step will be saved, by default, in `output-main/` and the final data (added column whether the sample exists in FineWeb-2) in `output/`.
 
 ## Progress
 
-@ https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons
+See [the dataset page](https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons).
 
-### Done
-
-- 
-
-### Running
-
-- CC-MAIN-2019-30
-- CC-MAIN-2020-05
-
-### To do
-
-- CC-MAIN-2021-04
-- CC-MAIN-2022-05
-- CC-MAIN-2023-06
-- CC-MAIN-2024-51
 
 ## Citation
 
