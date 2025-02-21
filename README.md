@@ -2,7 +2,7 @@
 
 > *Raw CommonCrawl crawls, annotated with potential Creative Commons license information*
 
-The licensing information is extracted from the web pages based on whether they link to Creative Commons licenses but false positives may occur! While further filtering based on the location type of the license should improve the precision (e.g. by removing hyperlink (a_tag) references), false positives may still occur. **Note that no quality filter occurs to ensure a wide coverage!** However, a column is added to indicate whether a sample exists in the FineWeb-2 dataset.
+The licensing information is extracted from the web pages based on whether they link to Creative Commons licenses but false positives may occur! While further filtering based on the location type of the license should improve the precision (e.g. by removing hyperlink (a_tag) references), false positives may still occur. **Note that no quality filter occurs to ensure a wide coverage!** However, a column is added to indicate whether a sample exists in the FineWeb(-2) dataset.
 
 By default, we only process the following languages, although you can change this by add a `languages` key to your YAML config file with the languages that you want. Default:
 
@@ -51,7 +51,8 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
 - language_script: the script of the language as detected by `glotlid`
 - language: the language, as detected by `glotlid`
 - language_score: the language identification confidence score
-- found_in_fw: whether this sample was found in FineWeb-2 based on the. Crawls that are more recent than FW2 (everything after 2024-18) are marked as None. English crawl is also marked as None!
+- found_in_fw: whether this sample was found in FineWeb(-2). For non-English, crawls that are more recent than FW2 (everything after 2024-18) is marked as None. For English, crawls that are more recent than FW v1.3 is marked as None (after 2024-51).
+
 
 ## Installation
 
@@ -65,7 +66,9 @@ python -m pip install -e .
 
 While `local` alternatives are given for running the pipeline on your local machine, the recommended use is via SLURM through `scripts/run_slurm.py`. Usage is facilitated via the SLURM launch scripts in `slurm/launch.slurm`. To use the scripts, you do need to take care of some things:
 
-1. The pipeline includes a check to see whether a sample exists in the FineWeb-2 dataset as a quality signal. Download the DuckDB files of the languages that you are interested in. By default we process the languages mentioned above, so to download those to the expected `duckdbs/fineweb-2` directory inside this project root:
+1. The pipeline includes a check to see whether a sample exists in the FineWeb(-2) dataset as a quality signal. Download the DuckDB files of the languages that you are interested in. By default we process the languages mentioned above, so to download those to the expected `duckdbs/fineweb-2` directory inside this project root.
+
+**Update:** this step is now automated. You do not have to do it manually anymore, but obviously if that works better for your workflow you can still do that.
 
 ```shell
 huggingface-cli download BramVanroy/fineweb-2-duckdbs fw2-afr_Latn.duckdb --local-dir duckdbs/fineweb-2/ --repo-type dataset
@@ -77,6 +80,12 @@ huggingface-cli download BramVanroy/fineweb-2-duckdbs fw2-nld_Latn.duckdb --loca
 huggingface-cli download BramVanroy/fineweb-2-duckdbs fw2-spa_Latn.duckdb --local-dir duckdbs/fineweb-2/ --repo-type dataset
 ```
 
+For English, we use FineWeb DuckDBs. These are structured differently - one DuckDB per crawl name (e.g. 2024-51).
+
+```shell
+huggingface-cli download BramVanroy/fineweb-duckdbs fw-CC-MAIN-2024-51.duckdb --local-dir duckdbs/fineweb/ --repo-type dataset
+```
+
 2. In the SLURM scripts under `slurm/`, change the constants/variables in capital letters with your specific use-case (account, partition, etc.).
 3. Update the config under `configs/` depending on your hardware. This may take some trial and error on your specific system configuration but the default values are expected to work. In the `configs/config-slurm.yaml` make sure to updated the root dir where you saved the DuckDB files
 
@@ -86,7 +95,7 @@ Now you can submit the job to start processing a specific crawl, e.g.
 sbatch launch.slurm CC-MAIN-2024-51
 ```
 
-Output of the first step will be saved, by default, in `output-main/` and the final data (added column whether the sample exists in FineWeb-2) in `output/`.
+Output of the first step will be saved, by default, in `output-main/` and the final data (added column whether the sample exists in FineWeb(-2)) in `output/`.
 
 ## Progress
 

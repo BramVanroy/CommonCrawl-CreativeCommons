@@ -13,7 +13,7 @@ from commoncrawl_cc_annotation.utils import extract_uuid
 
 TMP_DIR = "fix_eng_tmp"
 LOCAL_TMPL_FW_DUCKDB = "duckdbs/fineweb/fw-{dump}.duckdb"
-IGNORE_DUMPS = {}
+IGNORE_DUMPS = {"CC-MAIN-2019-30"}
 
 def check_eng_fw(ids, con):
     uuids = [extract_uuid(uid) for uid in ids]
@@ -102,7 +102,7 @@ def main():
             )
             futures.append((future, local_fname))
     
-    for future, local_fname in as_completed(futures):
+    for future, local_fname in futures:
         future.result()
         print(f"Uploaded {local_fname}")
 
