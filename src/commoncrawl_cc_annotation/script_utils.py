@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 import pyarrow as pa
+from datasets import load_dataset
 from datatrove.pipeline.base import PipelineStep
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import (
@@ -13,7 +14,7 @@ from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from huggingface_hub import hf_hub_download
 from pydantic import BaseModel
-from datasets import load_dataset
+
 from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter
 
@@ -173,6 +174,7 @@ def build_containment_pipeline(
         ),
     ]
 
+
 def get_fw_c_and_d_domains() -> set[str]:
     """
     Get the domains that were removed from FineWeb(-2) as a result from a cease-and-desist letter,
@@ -183,7 +185,6 @@ def get_fw_c_and_d_domains() -> set[str]:
     """
     ds = load_dataset("BramVanroy/finewebs-copyright-domains", split="train")
     return set(ds["domain"])
-
 
 
 SCHEMA = pa.schema(

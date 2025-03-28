@@ -45,10 +45,9 @@ def extract_html_from_warc(warc_file_path, target_uuid):
 
 
 def main():
-    target_uuid = "<urn:uuid:cf556dee-c1ad-44a8-847d-fd37069e6be5>"
-    warc_path = (
-        "crawl-data/CC-MAIN-2023-06/segments/1674764500044.66/warc/CC-MAIN-20230203091020-20230203121020-00488.warc.gz"
-    )
+    target_uuid = "<urn:uuid:d5a13e0d-1197-4f6e-bbc7-fedee55980ae>"
+    dump = "CC-MAIN-2013-20"
+    warc_path = f"crawl-data/{dump}/segments/1368702730377/warc/CC-MAIN-20130516111210-00038-ip-10-60-113-184.ec2.internal.warc.gz"
     file_url = f"https://data.commoncrawl.org/{warc_path}"
     local_warc_file = "downloaded_warc_file.warc.gz"
 

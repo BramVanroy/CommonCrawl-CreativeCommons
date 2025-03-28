@@ -40,7 +40,8 @@ dependencies = [
     "lxml",
     "lxml_html_clean",
     "pip",
-    "pydantic"
+    "pydantic",
+    "tldextract",
 ]
 
 [project.optional-dependencies]

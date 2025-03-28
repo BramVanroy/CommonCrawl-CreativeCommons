@@ -2,14 +2,13 @@ import os
 from pathlib import Path
 from shutil import rmtree
 from time import sleep
-from typing import Callable
+from typing import Callable, Literal
 
 import duckdb
 from datasets import (
     DatasetDict,
     IterableDatasetDict,
     concatenate_datasets,
-    disable_caching,
     get_dataset_config_names,
     load_dataset,
 )
@@ -20,10 +19,6 @@ from huggingface_hub.hf_api import create_repo, repo_exists
 from commoncrawl_cc_annotation.utils import extract_uuid
 
 
-# Disable chacing to save space
-disable_caching()
-
-
 def dataset_to_duckdb(
     dataset_name: str,
     duckdb_path: str,
@@ -32,9 +27,8 @@ def dataset_to_duckdb(
     cache_dir: str | None = None,
     clear_cache_dir: bool = True,
     overwrite: bool = False,
-    streaming: bool = False,
-    num_loaders: int = 1,
-    num_workers: int = 1,
+    num_loaders: int | None = None,
+    num_workers: int | None = None,
 ) -> bool:
     """
     Load a HuggingFace dataset and save one of its columns as a parquet file so that we can use it to
@@ -46,17 +40,13 @@ def dataset_to_duckdb(
         unique_column_func: A function to apply to each sample to add the unique column, or the name of the unique column
         dataset_config: The configuration of the dataset
         overwrite: Whether to overwrite the parquet file if it already exists
-        streaming: Whether to stream the dataset (likely slower but saves disk space)
-        num_loaders: The number of parallel loaders to use. 
+        num_loaders: The number of parallel loaders to use.
         num_workers: The number of parallel workers to use when applying the unique_column_func if it is a Callable
         only_load_columns: The columns to load from the dataset. Can improve the download time by only downloading these columns
 
     Returns:
         Whether the DuckDB file was successfully built
     """
-    if streaming:
-        raise NotImplementedError("Streaming is not yet supported")
-
     if os.path.isfile(duckdb_path) and os.path.getsize(duckdb_path) > 0:
         if overwrite:
             os.remove(duckdb_path)
@@ -71,8 +61,7 @@ def dataset_to_duckdb(
         ds = load_dataset(
             dataset_name,
             dataset_config,
-            streaming=streaming,
-            num_proc=num_loaders if not streaming else None,
+            num_proc=num_loaders,
             # Only works when the origin files are parquet.
             columns=["dump", "id"],
             cache_dir=cache_dir,
@@ -82,11 +71,13 @@ def dataset_to_duckdb(
             ds = load_dataset(
                 dataset_name,
                 dataset_config,
-                streaming=streaming,
-                num_proc=num_loaders if not streaming else None,
+                num_proc=num_loaders,
+                cache_dir=cache_dir,
             )
         except Exception:
-            print(f"Failed to load dataset {dataset_name} with config {dataset_config}")
+            print(
+                f"Failed to load dataset {dataset_name} with config {dataset_config}. Maybe the config is too recent?"
+            )
             return False
 
     if isinstance(ds, DatasetDict) or isinstance(ds, IterableDatasetDict):
@@ -95,17 +86,14 @@ def dataset_to_duckdb(
     ds = ds.remove_columns([c for c in ds.column_names if c not in ("dump", "id")])
 
     if id_prep_func:
-        if streaming:
-            ds = ds.map(lambda sample: {"id": id_prep_func(sample)})
-        else:
-            ds = ds.map(lambda sample: {"id": id_prep_func(sample)}, num_proc=num_workers)
+        ds = ds.map(lambda sample: {"id": id_prep_func(sample)}, num_proc=num_workers)
 
     farrow = str(Path(duckdb_path).with_suffix(".parquet").resolve())
     ds.to_parquet(farrow)
     del ds
-       
+
     con = duckdb.connect(duckdb_path)
-    if dataset_name == "HuggingFaceFW/fineweb-2":         
+    if dataset_name == "HuggingFaceFW/fineweb-2":
         # Create table with two columns: dump and id, and add a primary key on the composite
         con.execute(f"""
             CREATE OR REPLACE TABLE data (
@@ -158,33 +146,63 @@ KEEP_LOCAL = [
 ]
 
 
-def build_all_fw2_dbs(overwrite: bool = False):
+def build_fw2_dbs(
+    overwrite: bool = False,
+    skip_cfgs: list[str] = None,
+    portion: Literal["all", "kept", "removed"] = "kept",
+    priority_cfgs: list[str] = None,
+):
+    skip_cfgs = skip_cfgs or []
     dataset_name = "HuggingFaceFW/fineweb-2"
-    config_names = [cfg for cfg in get_dataset_config_names(dataset_name) if "removed" not in cfg]
+    config_names = []
+
+    for cfg in get_dataset_config_names(dataset_name):
+        # Undefined languages
+        if cfg.startswith("und_"):
+            continue
+        if portion == "all":
+            config_names.append(cfg)
+        elif portion == "kept":
+            if "removed" not in cfg:
+                config_names.append(cfg)
+        elif portion == "removed" and "_removed" in cfg:
+            config_names.append(cfg)
+        else:
+            raise ValueError(f"Invalid portion: {portion}. Valid values are 'all', 'kept', 'removed'")
+
+    if priority_cfgs:
+        priority_cfgs = [c for c in priority_cfgs if c in config_names]
+        config_names = priority_cfgs + [c for c in config_names if c not in priority_cfgs]
+
     existing_files_in_repo = list_repo_files(repo_id="BramVanroy/fineweb-2-duckdbs", repo_type="dataset")
 
-    language_success = {}
-    for lang in config_names:
-        local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{lang}.duckdb"
+    config_success = {}
+    for cfg_name in config_names:
+        if cfg_name in skip_cfgs:
+            print(f"Skipping {cfg_name} because it is in skip_cfgs")
+            continue
+
+        local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{cfg_name}.duckdb"
         path_in_repo = Path(local_duckdb_path).name
         exists_in_repo = path_in_repo in existing_files_in_repo
 
         if overwrite or (not os.path.isfile(local_duckdb_path) and not exists_in_repo):
-            print(f"Buidling DuckDB for {lang}")
+            print(f"Buidling DuckDB for {cfg_name}")
             lang_success = dataset_to_duckdb(
                 "HuggingFaceFW/fineweb-2",
                 local_duckdb_path,
                 # For fineweb we still have to extract the UUID from the `id` column
                 id_prep_func=fw_prep_func,
-                dataset_config=lang,
+                dataset_config=cfg_name,
                 overwrite=False,
-                streaming=False,
                 num_loaders=None,
                 num_workers=64,
+                cache_dir=f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw-2/{cfg_name}",
+                clear_cache_dir=True,
             )
-            language_success[lang] = lang_success
+            config_success[cfg_name] = lang_success
         else:
-            language_success[lang] = True
+            config_success[cfg_name] = True
 
         if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
             print(f"Uploading {local_duckdb_path}")
@@ -206,23 +224,26 @@ def build_all_fw2_dbs(overwrite: bool = False):
                 else:
                     break
 
-            if lang not in KEEP_LOCAL:
+            if not any(cfg_name.startswith(lang) for lang in KEEP_LOCAL):
                 os.remove(local_duckdb_path)
 
             sleep(30)
 
-    print("Failed languages:")
-    for lang, success in language_success.items():
-        if not success:
-            print(f"- {lang}")
+    failed_cfgs = {cfg_name for cfg_name, success in config_success.items() if not success}
+
+    if failed_cfgs:
+        print("Failed languages:")
+        for cfg in failed_cfgs:
+            print(f"- {cfg}")
 
 
-def build_fw_dbs(overwrite: bool = False):
+def build_fw_dbs(overwrite: bool = False, skip_dumps: list[str] = None, priority_dumps: list[str] = None):
+    skip_dumps = skip_dumps or []
     dataset_name = "HuggingFaceFW/fineweb"
-    dump_names = [cfg for cfg in get_dataset_config_names(dataset_name) if "sample" not in cfg and cfg != "default"]
-    priority_dumps = ["CC-MAIN-2019-30", "CC-MAIN-2020-05", "CC-MAIN-2021-04", "CC-MAIN-2022-05", "CC-MAIN-2023-06", "CC-MAIN-2024-51", "CC-MAIN-2025-05"]
-    priority_dumps = [d for d in priority_dumps if d in dump_names]
-    dump_names = priority_dumps + [d for d in dump_names if d not in priority_dumps]
+    dump_names = [cfg for cfg in get_dataset_config_names(dataset_name) if cfg.startswith("CC-MAIN")]
+    if priority_dumps:
+        priority_dumps = [d for d in priority_dumps if d in dump_names]
+        dump_names = priority_dumps + [d for d in dump_names if d not in priority_dumps]
 
     print("Dump names")
     print(dump_names)
@@ -234,6 +255,10 @@ def build_fw_dbs(overwrite: bool = False):
 
     dump_success_result = {}
     for dump in dump_names:
+        if dump in skip_dumps:
+            print(f"Skipping {dump} because it is in skip_dumps")
+            continue
+
         local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb/fw-{dump}.duckdb"
         path_in_repo = Path(local_duckdb_path).name
         exists_in_repo = path_in_repo in existing_files_in_repo
@@ -243,18 +268,19 @@ def build_fw_dbs(overwrite: bool = False):
             dump_success = dataset_to_duckdb(
                 "HuggingFaceFW/fineweb",
                 local_duckdb_path,
-                # For fineweb we still have to extract the UUID from the `id` column
                 id_prep_func=fw_prep_func,
                 dataset_config=dump,
                 overwrite=False,
-                streaming=False,
-                num_loaders=4,
+                num_loaders=None,
                 num_workers=64,
                 cache_dir=f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw/{dump}",
                 clear_cache_dir=True,
             )
             dump_success_result[dump] = dump_success
         else:
+            print(
+                f"Skipping processing {dump} because the DuckDB file already exists either locally or in the remote repo"
+            )
             dump_success_result[dump] = True
 
         if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
@@ -287,7 +313,18 @@ def build_fw_dbs(overwrite: bool = False):
         if not success:
             print(f"- {dump}")
 
-if __name__ == "__main__":
-    # build_all_fw2_dbs()
-    build_fw_dbs()
 
+if __name__ == "__main__":
+    priority_cfgs = [f"{c}_removed" for c in KEEP_LOCAL] + KEEP_LOCAL
+    build_fw2_dbs(portion="all", priority_cfgs=priority_cfgs)
+    build_fw_dbs(
+        priority_dumps=[
+            "CC-MAIN-2019-30",
+            "CC-MAIN-2020-05",
+            "CC-MAIN-2021-04",
+            "CC-MAIN-2022-05",
+            "CC-MAIN-2023-06",
+            "CC-MAIN-2024-51",
+            "CC-MAIN-2025-05",
+        ],
+    )

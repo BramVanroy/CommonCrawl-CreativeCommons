@@ -71,7 +71,7 @@ class FWDatabaseContainmentAnnotator(BaseBatchAnnotator):
                     self.cons[full_lang] = con
 
                 con = self.cons[full_lang]
-                
+
                 # Batch query: check multiple UUIDs at once
                 # FineWeb (English) only has the `id` column to test for existence
                 if full_lang == self.fw_eng_tag:
@@ -94,7 +94,7 @@ class FWDatabaseContainmentAnnotator(BaseBatchAnnotator):
                         ON v.dump = d.dump AND v.id = d.id;
                     """
                     results = con.execute(query, [value for pair in uuids for value in pair]).fetchall()
-                
+
                 results = [bool(r[0]) for r in results]
 
                 # Update documents with results
