@@ -16,7 +16,7 @@ readme = "README.md"
 keywords = ["data creation", "copyrighted data", "data annotation", "common crawl"]
 license = {file = "LICENSE"}
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
