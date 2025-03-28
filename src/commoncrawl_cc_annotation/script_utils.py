@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pyarrow as pa
 from datatrove.pipeline.base import PipelineStep
@@ -11,11 +11,12 @@ from datatrove.pipeline.filters import (
 from datatrove.pipeline.formatters import FTFYFormatter, PIIFormatter, SymbolLinesFormatter
 from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
+from huggingface_hub import hf_hub_download
 from pydantic import BaseModel
-
+from datasets import load_dataset
 from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter
-from huggingface_hub import hf_hub_download
+
 
 # Afrikaans, German, English, French, Frisian, Italian, Dutch, Spanish
 LANGUAGES = [
@@ -68,8 +69,8 @@ class BaseConfig(BaseModel):
 class SlurmConfig(BaseConfig):
     """Slurm configuration for running the pipeline on a cluster"""
 
-    main_time: str = "3:00:00"
-    containment_time: str = "3:00:00"
+    main_time: str = "3-00:00:00"
+    containment_time: str = "1-00:00:00"
     main_mem_per_cpu_gb: int = 4
     containment_mem_per_cpu_gb: int = 4
     main_cpus_per_task: int = 1
@@ -82,6 +83,7 @@ def build_main_pipeline(
     languages: list[str],
     language_threshold: float = 0.65,
     limit: int = -1,
+    extra_domains: list[str] | None = None,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -94,10 +96,12 @@ def build_main_pipeline(
         language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
         -1 = no limit. Defaults to -1.
+        extra_domains (list[str], optional): List of extra domains to filter for. Defaults to None.
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
+    print(extra_domains)
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -105,7 +109,9 @@ def build_main_pipeline(
             default_metadata={"dump": dump},
             limit=limit,
         ),
-        URLFilter(),
+        URLFilter(
+            extra_domains=extra_domains,
+        ),
         EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
         LicenseAnnotator(),
         LicenseFilter(),
@@ -123,7 +129,7 @@ def build_main_pipeline(
 
 
 def build_containment_pipeline(
-    input_path: str,    
+    input_path: str,
     fw_duckdb_path: str,
     fw2_duckdb_templ_path: str,
     ignore_duckdb_for: list[str],
@@ -167,6 +173,18 @@ def build_containment_pipeline(
         ),
     ]
 
+def get_fw_c_and_d_domains() -> set[str]:
+    """
+    Get the domains that were removed from FineWeb(-2) as a result from a cease-and-desist letter,
+    collecting in this repository: BramVanroy/finewebs-copyright-domains
+
+    These domains can then be forwarded to the URL filter's `extra_domains`, ensuring that
+    these domains are not included in our dataset.
+    """
+    ds = load_dataset("BramVanroy/finewebs-copyright-domains", split="train")
+    return set(ds["domain"])
+
+
 
 SCHEMA = pa.schema(
     [
@@ -202,6 +220,107 @@ SCHEMA = pa.schema(
     ]
 )
 
+SCHEMA_NULLABLE = pa.schema(
+    [
+        pa.field("text", pa.string()),
+        pa.field("id", pa.string()),
+        pa.field("dump", pa.string()),
+        pa.field("url", pa.string()),
+        pa.field("date", pa.string()),
+        pa.field("file_path", pa.string()),
+        pa.field("license_abbr", pa.string()),
+        pa.field("license_version", pa.string()),
+        pa.field("license_location", pa.string()),
+        pa.field("license_in_head", pa.bool_()),
+        pa.field("license_in_footer", pa.bool_()),
+        pa.field(
+            "potential_licenses",
+            pa.struct(
+                [
+                    pa.field("abbr", pa.list_(pa.string())),
+                    pa.field("in_footer", pa.list_(pa.bool_())),
+                    pa.field("in_head", pa.list_(pa.bool_())),
+                    pa.field("location", pa.list_(pa.string())),
+                    pa.field("version", pa.list_(pa.string())),
+                ]
+            ),
+        ),
+        pa.field("license_parse_error", pa.bool_()),
+        pa.field("license_disagreement", pa.bool_()),
+        pa.field("language_script", pa.string()),
+        pa.field("language", pa.string()),
+        pa.field("language_score", pa.float64()),
+        pa.field("found_in_fw", pa.bool_()),
+    ]
+)
+
+FW2_SCHEMA = pa.schema(
+    [
+        pa.field("text", pa.string(), nullable=False),
+        pa.field("id", pa.string(), nullable=False),
+        pa.field("dump", pa.string(), nullable=False),
+        pa.field("url", pa.string(), nullable=False),
+        pa.field("date", pa.string(), nullable=False),
+        pa.field("file_path", pa.string(), nullable=False),
+        pa.field("license_abbr", pa.string(), nullable=False),
+        pa.field("license_version", pa.string(), nullable=True),
+        pa.field("license_location", pa.string(), nullable=False),
+        pa.field("license_in_head", pa.bool_(), nullable=False),
+        pa.field("license_in_footer", pa.bool_(), nullable=False),
+        pa.field(
+            "potential_licenses",
+            pa.struct(
+                [
+                    pa.field("abbr", pa.list_(pa.string()), nullable=False),
+                    pa.field("in_footer", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("in_head", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("location", pa.list_(pa.string()), nullable=False),
+                    pa.field("version", pa.list_(pa.string()), nullable=False),
+                ]
+            ),
+        ),
+        pa.field("license_parse_error", pa.bool_(), nullable=False),
+        pa.field("license_disagreement", pa.bool_(), nullable=False),
+        pa.field("language_script", pa.string(), nullable=False),
+        pa.field("language", pa.string(), nullable=False),
+        pa.field("language_score", pa.float64(), nullable=False),
+        pa.field("found_in_fw2", pa.bool_(), nullable=True),
+    ]
+)
+
+NO_FW_SCHEMA = pa.schema(
+    [
+        pa.field("text", pa.string(), nullable=False),
+        pa.field("id", pa.string(), nullable=False),
+        pa.field("dump", pa.string(), nullable=False),
+        pa.field("url", pa.string(), nullable=False),
+        pa.field("date", pa.string(), nullable=False),
+        pa.field("file_path", pa.string(), nullable=False),
+        pa.field("license_abbr", pa.string(), nullable=False),
+        pa.field("license_version", pa.string(), nullable=True),
+        pa.field("license_location", pa.string(), nullable=False),
+        pa.field("license_in_head", pa.bool_(), nullable=False),
+        pa.field("license_in_footer", pa.bool_(), nullable=False),
+        pa.field(
+            "potential_licenses",
+            pa.struct(
+                [
+                    pa.field("abbr", pa.list_(pa.string()), nullable=False),
+                    pa.field("in_footer", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("in_head", pa.list_(pa.bool_()), nullable=False),
+                    pa.field("location", pa.list_(pa.string()), nullable=False),
+                    pa.field("version", pa.list_(pa.string()), nullable=False),
+                ]
+            ),
+        ),
+        pa.field("license_parse_error", pa.bool_(), nullable=False),
+        pa.field("license_disagreement", pa.bool_(), nullable=False),
+        pa.field("language_script", pa.string(), nullable=False),
+        pa.field("language", pa.string(), nullable=False),
+        pa.field("language_score", pa.float64(), nullable=False),
+    ]
+)
+
 
 def job_id_retriever(job_id: str) -> str:
     return re.search(r"Submitted batch job (\d+)", job_id).group(1)
@@ -229,11 +348,15 @@ def build_upload_pipeline(jsonl_path: str, output_path: str, hf_repo: str, limit
 def auto_download_duckdbs(languages: list[str], fw2_duckdb_templ_path: str, fw_duckdb_path: str):
     pfw = Path(fw_duckdb_path)
     for lang in languages:
-        if lang == "eng_Latn":            
+        if lang == "eng_Latn":
             if not pfw.exists() or pfw.stat().st_size == 0:
-                hf_hub_download(repo_id="BramVanroy/fineweb-duckdbs", filename=pfw.name, local_dir=pfw.parent, repo_type="dataset")
+                hf_hub_download(
+                    repo_id="BramVanroy/fineweb-duckdbs", filename=pfw.name, local_dir=pfw.parent, repo_type="dataset"
+                )
         else:
             local_path = fw2_duckdb_templ_path.format(language=lang)
             pf = Path(local_path)
             if not pf.exists() or pf.stat().st_size == 0:
-                hf_hub_download(repo_id="BramVanroy/fineweb-2-duckdbs", filename=pf.name, local_dir=pf.parent, repo_type="dataset")
+                hf_hub_download(
+                    repo_id="BramVanroy/fineweb-2-duckdbs", filename=pf.name, local_dir=pf.parent, repo_type="dataset"
+                )

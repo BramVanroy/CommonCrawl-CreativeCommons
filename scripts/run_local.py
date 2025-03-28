@@ -3,19 +3,26 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import BaseConfig, auto_download_duckdbs, build_containment_pipeline, build_main_pipeline
+from commoncrawl_cc_annotation.script_utils import (
+    BaseConfig,
+    auto_download_duckdbs,
+    build_containment_pipeline,
+    build_main_pipeline,
+    get_fw_c_and_d_domains,
+)
 from commoncrawl_cc_annotation.utils import PROJECT_ROOT
 
 
 def main(
     dump: str,
     output_path: str,
-    pipelines_config: str | None = None,
+    pipelines_config: str,
 ):
     if pipelines_config and Path(pipelines_config).is_file():
         config = yaml.safe_load(Path(pipelines_config).read_text(encoding="utf-8"))
     else:
-        config = {}
+        raise FileNotFoundError("pipelines_config file not found")
+
     cfg = BaseConfig(**config)
 
     # If dump is more recent than 2024-18, we auto-set the found_in_fw
@@ -28,17 +35,17 @@ def main(
     ignore_duckdb_for = cfg.ignore_duckdb_for or []
     if dump_year > 2024 or (dump_year == 2024 and dump_issue > 18):
         ignore_duckdb_for += cfg.languages
-    
+
     # FW1 v1.3 contains data up to 2024-51
     if dump_year > 2024 or (dump_year == 2024 and dump_issue > 51):
         ignore_duckdb_for += "eng_Latn"
-    
+
     if "{language}" not in cfg.fw2_duckdb_templ_path:
         raise ValueError("The fw2_duckdb_templ_path must contain the string '{language}'")
-    
+
     if "{dump}" not in cfg.fw_duckdb_templ_path:
         raise ValueError("The fw_duckdb_templ_path must contain the string '{dump}'")
-    
+
     fw_duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
 
     auto_download_duckdbs(
@@ -55,6 +62,7 @@ def main(
         languages=cfg.languages,
         language_threshold=cfg.language_threshold,
         limit=cfg.limit,
+        extra_domains=get_fw_c_and_d_domains(),
     )
     main_executor = LocalPipelineExecutor(
         pipeline=main_pipeline,
@@ -100,9 +108,8 @@ if __name__ == "__main__":
     cparser.add_argument(
         "-c",
         "--pipelines_config",
-        default=None,
         type=str,
-        help="Path to the pipelines YAML config file. If not given will use default values.",
+        help="Path to the pipelines YAML config file.",
     )
 
     cli_kwargs = vars(cparser.parse_args())
