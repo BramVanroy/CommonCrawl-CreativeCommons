@@ -129,7 +129,7 @@ If you use this library or data that was created with it, please cite:
   month = feb,
   title = {{CommonCrawl-CreativeCommons}},
   url = {https://github.com/BramVanroy/CommonCrawl-CreativeCommons},
-  version = {1.1.0},
+  version = {1.3.0},
   year = {2025}
 }
 ```
