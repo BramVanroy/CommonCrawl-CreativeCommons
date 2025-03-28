@@ -72,12 +72,14 @@ def get_stats(only_found_in_fw: bool = False):
     for crawl in CRAWLS:
         print_table += f"{crawl}[tab]"
         for dtype in ("docs", "tokens"):
+            total = 0
             for lang in LANGUAGES:
                 print_table += (
                     f"{num_docs[crawl][lang]}[tab]" if dtype == "docs" else f"{num_tokens[crawl][lang]}[tab]"
                 )
-            # Empty cell because totals will be calculated automatically
-            print_table += "[tab]"
+                total += num_docs[crawl][lang] if dtype == "docs" else num_tokens[crawl][lang]
+            
+            print_table += f"{total}[tab]"
         print_table += "\n"
     print(print_table)
 

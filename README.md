@@ -1,8 +1,8 @@
-# Creative Commons License annotation of CommonCrawl
+# Creative Commons License annotation of Common Crawl
 
-> *Raw CommonCrawl crawls, annotated with potential Creative Commons license information*
+> *Raw Common Crawl crawls, annotated with potential Creative Commons license information*
 
-The licensing information is extracted from the web pages based on whether they link to Creative Commons licenses but false positives may occur! While further filtering based on the location type of the license should improve the precision (e.g. by removing hyperlink (a_tag) references), false positives may still occur. **Note that no quality filter occurs to ensure a wide coverage!** However, a column is added to indicate whether a sample exists in the FineWeb(-2) dataset.
+The licensing information is extracted from the web pages based on whether they link to Creative Commons licenses but false positives may occur! While further filtering based on the location type of the license should improve the precision (e.g. by removing hyperlink (a_tag) references), false positives may still occur. **Note that no quality filter occurs to ensure a wide coverage!** Similarly, no deduplication was executed, both for computational reasons and because the data is quite scarce so you may want to deduplicate yourself with less strict constraints. However, as an indicator for quality, a column is added to indicate whether a sample exists in the FineWeb(-2) dataset.
 
 By default, we only process the following languages, although you can change this by add a `languages` key to your YAML config file with the languages that you want. Default:
 
@@ -64,7 +64,7 @@ python -m pip install -e .
 
 ## Usage
 
-While `local` alternatives are given for running the pipeline on your local machine, the recommended use is via SLURM through `scripts/run_slurm.py`. Usage is facilitated via the SLURM launch scripts in `slurm/launch.slurm`. To use the scripts, you do need to take care of some things:
+While `local` alternatives are given for running the pipeline on your local machine (mostly for debugging), the recommended use is via SLURM through `scripts/run_slurm.py`. Usage is facilitated via the SLURM launch scripts in `slurm/launch.slurm`. To use the scripts, you do need to take care of some things:
 
 1. The pipeline includes a check to see whether a sample exists in the FineWeb(-2) dataset as a quality signal. Download the DuckDB files of the languages that you are interested in. By default we process the languages mentioned above, so to download those to the expected `duckdbs/fineweb-2` directory inside this project root.
 
@@ -97,6 +97,21 @@ sbatch launch.slurm CC-MAIN-2024-51
 
 Output of the first step will be saved, by default, in `output-main/` and the final data (added column whether the sample exists in FineWeb(-2)) in `output/`.
 
+## Post-processing
+
+Hugging Face publicly keeps track of cease-and-desists they have received, including for domains that were removed from FineWeb(-2). I collect those domains in [this repository](BramVanroy/finewebs-copyright-domains), which in turn allows us to filter out these offending domains from our dataset. From v1.3.0 of this library, the process is done automatically. For data that has been processed with an earlier version, a [utility script](scripts/post_processing/remove_copyrighted_domains.py) is provided, which will filter
+out offending domains on a per-parquet-file basis.
+
+## Analysis 
+
+### Document and token statistics
+
+You may be curious to get some document and token statistics. This could as well be implemented in datatrove, but I tend to do these steps on a separate, more locally accessible machine, so it's written as a separate script here. Running [scripts/analysis/find_docs_tokens_counts.py](scripts/analysis/find_docs_tokens_counts.py) will print out one row per crawl, with as columns the tokens/documents per language.
+
+### Finding top domains that are NOT CC-BY
+
+In addition to the CC-BY dataset, you may wish to figure out which domains are NOT in it, so you can contact domain owners individually to strike an agreement about using their data. With the script [scripts/analysis/find_top_domains.py](scripts/analysis/find_top_domains.py), we first get all domains found in a specific language's FineWeb-2 dataset, including the `_removed` portion. Then all domains that are present in the CC-BY dataset are removed from that initial set. Obviously this approach has issues: the CC-BY dataset does not contain the same crawls as FW2, so the potential coverage is different. Still, the results provide *some* insight into popular domains that were not (yet) found in the CC-BY data.
+
 
 ## Progress
 
@@ -122,6 +137,7 @@ If you use this library or data that was created with it, please cite:
 
 ## Acknowledgments
 
+- The [Common Crawl](https://commoncrawl.org/) non-profit organization. 
 - [TNO](https://www.tno.nl/nl/), who funded the work hours to accomplish this code. They intend to use (parts of) [the generated material](https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons) for the [GPT-NL project](https://gpt-nl.nl/).
 - [Flemish Supercomputer Center](https://www.vscentrum.be/) for part of the compute under grant 2024-107
 - Guilherme Penedo ([@guipenedo](https://huggingface.co/guipenedo)) and the rest of the [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb) and [datatrove](https://github.com/huggingface/datatrove) team for the help and insights

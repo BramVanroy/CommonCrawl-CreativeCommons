@@ -7,23 +7,25 @@ from huggingface_hub import hf_hub_download, list_repo_files
 
 from commoncrawl_cc_annotation.script_utils import SCHEMA_NULLABLE
 
-
-CRAWLS = [
-    # "CC-MAIN-2019-30",
+"""DONE:
+    "CC-MAIN-2019-30",
     "CC-MAIN-2020-05",
-    # "CC-MAIN-2023-06",
-    # "CC-MAIN-2024-51",
+    "CC-MAIN-2023-06",
+    "CC-MAIN-2024-51",
+
+"""
+CRAWLS = [
 ]
 
 LANGUAGES = [
-    # "afr",
-    # "deu",
+    "afr",
+    "deu",
     "eng",
-    # "fra",
-    # "fry",
-    # "ita",
-    # "nld",
-    # "spa",
+    "fra",
+    "fry",
+    "ita",
+    "nld",
+    "spa",
 ]
 
 CACHE_DIR = Path(__file__).parents[1] / "tmp" / "hub_download_test"
