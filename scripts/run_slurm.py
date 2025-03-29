@@ -50,11 +50,18 @@ def main(
 
     fw_duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
 
-    auto_download_duckdbs(
-        languages=cfg.languages,
-        fw2_duckdb_templ_path=cfg.fw2_duckdb_templ_path,
-        fw_duckdb_path=fw_duckdb_path,
-    )
+    # Only download languages that are not in ignore_duckdb_for (occurs when crawl is too recent)
+    duckdb_languages = []
+    for lang in cfg.languages:
+        if lang not in ignore_duckdb_for:
+            duckdb_languages.append(lang)
+
+    if duckdb_languages:
+        auto_download_duckdbs(
+            languages=duckdb_languages,
+            fw2_duckdb_templ_path=cfg.fw2_duckdb_templ_path,
+            fw_duckdb_path=fw_duckdb_path,
+        )
 
     main_output_path = output_path.rstrip("/") + "-main/"
     main_dump_output_path = main_output_path + dump + "/"
