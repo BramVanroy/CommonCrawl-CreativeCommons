@@ -102,7 +102,6 @@ def build_main_pipeline(
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
-    print(extra_domains)
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
