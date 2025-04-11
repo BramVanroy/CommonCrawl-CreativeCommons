@@ -112,7 +112,7 @@ def build_main_pipeline(
         URLFilter(
             extra_domains=extra_domains,
         ),
-        EmptyTextFilter(),  # filter items with empty HTML (text = read HTML at this point)
+        EmptyTextFilter(),  # filter items with empty HTML (text-attr = read HTML at this point)
         LicenseAnnotator(),
         LicenseFilter(),
         Trafilatura(favour_precision=True, timeout=600.0),
@@ -345,18 +345,98 @@ def build_upload_pipeline(jsonl_path: str, output_path: str, hf_repo: str, limit
     ]
 
 
-def auto_download_duckdbs(languages: list[str], fw2_duckdb_templ_path: str, fw_duckdb_path: str):
-    pfw = Path(fw_duckdb_path)
-    for lang in languages:
-        if lang == "eng_Latn":
-            if not pfw.exists() or pfw.stat().st_size == 0:
-                hf_hub_download(
-                    repo_id="BramVanroy/fineweb-duckdbs", filename=pfw.name, local_dir=pfw.parent, repo_type="dataset"
-                )
-        else:
-            local_path = fw2_duckdb_templ_path.format(language=lang)
-            pf = Path(local_path)
-            if not pf.exists() or pf.stat().st_size == 0:
-                hf_hub_download(
-                    repo_id="BramVanroy/fineweb-2-duckdbs", filename=pf.name, local_dir=pf.parent, repo_type="dataset"
-                )
+def get_dumps_with_duckdb(
+    dump_name: str, ignore_duckdb_for: list[str], languages: list[str]
+) -> tuple[list[str], bool]:
+    """
+    Get the list of languages that should be ignored when querying the DuckDB databases.
+    This is useful for dumps that are too recent and do not have the data in the DuckDB databases yet.
+    The function also returns a boolean indicating whether all languages should be ignored.
+
+    Args:
+        dump_name (str): Name of the dump (e.g., "CC-MAIN-2024-18")
+        ignore_duckdb_for (list[str]): Initial list of languages to ignore when querying the DuckDB databases,
+        for instance provided by the user in the config.
+        languages (list[str]): List of languages to process.
+
+    Returns:
+        tuple[list[str], bool]: A tuple containing:
+            - List of languages to ignore when querying the DuckDB databases, e.g. ["eng_Latn", "fra_Latn"].
+            - Boolean indicating whether all languages should be ignored.
+    """
+    dump_year = int(dump_name.split("-")[2])
+    dump_issue = int(dump_name.split("-")[3])
+
+    # Not in FineWeb-2
+    ignore_duckdb_for = ignore_duckdb_for or []
+
+    if dump_year > 2024 or (dump_year == 2024 and dump_issue > 18):
+        ignore_duckdb_for += [lang for lang in languages if lang != "eng_Latn"]
+
+    # FW1 v1.3 contains data up to 2024-51
+    if dump_year > 2024 or (dump_year == 2024 and dump_issue > 51):
+        ignore_duckdb_for += ["eng_Latn"]
+
+    ignore_all_duckdb = set(ignore_duckdb_for) == set(languages)
+
+    return ignore_duckdb_for, ignore_all_duckdb
+
+
+def download_duckdbs(dump_name: str, fw_duckdb_path: str, cfg: BaseConfig) -> tuple[list[str], bool]:
+    """
+    Download the DuckDB databases from Hugging Face if they are not already present on-disk, and verify
+    which languages should be ignored when querying the databases and whether ALL should be ignored.
+    This is useful because it would allow us to set the 'found' field to None for all documents.
+    See FWDatabaseContainmentAnnotator for more details.
+
+    Args:
+        dump_name (str): Name of the dump (e.g., "CC-MAIN-2024-18")
+        fw_duckdb_path (str): Path to the FineWeb DuckDB database (English) (filled in template URI).
+        cfg (BaseConfig): Configuration object containing the paths to the databases and other settings.
+
+    Returns:
+        tuple[list[str], bool]: A tuple containing:
+            - List of languages to ignore when querying the DuckDB databases, e.g. ["eng_Latn", "fra_Latn"].
+            - Boolean indicating whether all languages should be ignored.
+    """
+    if "{language}" not in cfg.fw2_duckdb_templ_path:
+        raise ValueError("The fw2_duckdb_templ_path must contain the string '{language}'")
+
+    if "{dump}" not in cfg.fw_duckdb_templ_path:
+        raise ValueError("The fw_duckdb_templ_path must contain the string '{dump}'")
+
+    ignore_duckdb_for, ignore_all_duckdb = get_dumps_with_duckdb(
+        dump_name,
+        cfg.ignore_duckdb_for,
+        cfg.languages,
+    )
+
+    # Only download languages that are not in ignore_duckdb_for (occurs when crawl is too recent or in config ignore_duckdb_for)
+    duckdb_languages = []
+    for lang in cfg.languages:
+        if lang not in ignore_duckdb_for:
+            duckdb_languages.append(lang)
+
+    if duckdb_languages:
+        pfw = Path(fw_duckdb_path)
+        for lang in duckdb_languages:
+            if lang == "eng_Latn":
+                if not pfw.exists() or pfw.stat().st_size == 0:
+                    hf_hub_download(
+                        repo_id="BramVanroy/fineweb-duckdbs",
+                        filename=pfw.name,
+                        local_dir=pfw.parent,
+                        repo_type="dataset",
+                    )
+            else:
+                local_path = cfg.fw2_duckdb_templ_path.format(language=lang)
+                pf = Path(local_path)
+                if not pf.exists() or pf.stat().st_size == 0:
+                    hf_hub_download(
+                        repo_id="BramVanroy/fineweb-2-duckdbs",
+                        filename=pf.name,
+                        local_dir=pf.parent,
+                        repo_type="dataset",
+                    )
+
+    return ignore_duckdb_for, ignore_all_duckdb
