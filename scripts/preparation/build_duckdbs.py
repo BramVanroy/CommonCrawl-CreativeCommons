@@ -156,6 +156,11 @@ def build_fw2_dbs(
     dataset_name = "HuggingFaceFW/fineweb-2"
     config_names = []
 
+    fw2_tmp_dir = Path(__file__).parents[2] / "tmp" / "fineweb-2"
+    fw2_tmp_dir.mkdir(parents=True, exist_ok=True)
+    local_duckdb_root = Path(__file__).parents[2] / "duckdbs" / "fineweb-2" 
+    local_duckdb_root.mkdir(parents=True, exist_ok=True)
+
     for cfg in get_dataset_config_names(dataset_name):
         # Undefined languages
         if cfg.startswith("und_"):
@@ -182,7 +187,7 @@ def build_fw2_dbs(
             print(f"Skipping {cfg_name} because it is in skip_cfgs")
             continue
 
-        local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb-2/fw2-{cfg_name}.duckdb"
+        local_duckdb_path = str(local_duckdb_root / f"fw2-{cfg_name}.duckdb")
         path_in_repo = Path(local_duckdb_path).name
         exists_in_repo = path_in_repo in existing_files_in_repo
 
@@ -197,7 +202,7 @@ def build_fw2_dbs(
                 overwrite=False,
                 num_loaders=None,
                 num_workers=64,
-                cache_dir=f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw-2/{cfg_name}",
+                cache_dir=str(fw2_tmp_dir / cfg_name),
                 clear_cache_dir=True,
             )
             config_success[cfg_name] = lang_success
@@ -241,9 +246,15 @@ def build_fw_dbs(overwrite: bool = False, skip_dumps: list[str] = None, priority
     skip_dumps = skip_dumps or []
     dataset_name = "HuggingFaceFW/fineweb"
     dump_names = [cfg for cfg in get_dataset_config_names(dataset_name) if cfg.startswith("CC-MAIN")]
+    dump_names = sorted(dump_names, reverse=True)
     if priority_dumps:
         priority_dumps = [d for d in priority_dumps if d in dump_names]
         dump_names = priority_dumps + [d for d in dump_names if d not in priority_dumps]
+
+    fw_tmp_dir = Path(__file__).parents[2] / "tmp" / "fineweb"
+    fw_tmp_dir.mkdir(parents=True, exist_ok=True)
+    local_duckdb_root = Path(__file__).parents[2] / "duckdbs" / "fineweb" 
+    local_duckdb_root.mkdir(parents=True, exist_ok=True)
 
     print("Dump names")
     print(dump_names)
@@ -259,7 +270,7 @@ def build_fw_dbs(overwrite: bool = False, skip_dumps: list[str] = None, priority
             print(f"Skipping {dump} because it is in skip_dumps")
             continue
 
-        local_duckdb_path = f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/duckdbs/fineweb/fw-{dump}.duckdb"
+        local_duckdb_path = str(local_duckdb_root / f"fw-{dump}.duckdb")
         path_in_repo = Path(local_duckdb_path).name
         exists_in_repo = path_in_repo in existing_files_in_repo
 
@@ -273,7 +284,7 @@ def build_fw_dbs(overwrite: bool = False, skip_dumps: list[str] = None, priority
                 overwrite=False,
                 num_loaders=None,
                 num_workers=64,
-                cache_dir=f"/home/ampere/vanroy/CommonCrawl-CreativeCommons/tmp/fw/{dump}",
+                cache_dir=str(fw_tmp_dir / dump),
                 clear_cache_dir=True,
             )
             dump_success_result[dump] = dump_success
@@ -315,16 +326,30 @@ def build_fw_dbs(overwrite: bool = False, skip_dumps: list[str] = None, priority
 
 
 if __name__ == "__main__":
-    priority_cfgs = [f"{c}_removed" for c in KEEP_LOCAL] + KEEP_LOCAL
-    build_fw2_dbs(portion="all", priority_cfgs=priority_cfgs)
-    build_fw_dbs(
-        priority_dumps=[
-            "CC-MAIN-2019-30",
-            "CC-MAIN-2020-05",
-            "CC-MAIN-2021-04",
-            "CC-MAIN-2022-05",
-            "CC-MAIN-2023-06",
-            "CC-MAIN-2024-51",
-            "CC-MAIN-2025-05",
-        ],
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Build DuckDBs for the fineweb datasets")
+    parser.add_argument(
+        "--fw-version",
+        choices=["fineweb-2", "fineweb"],
+        required=True
     )
+    cargs = parser.parse_args()
+    if cargs.fw_version == "fineweb-2":
+        fw2_priority_cfgs = [f"{c}_removed" for c in KEEP_LOCAL] + KEEP_LOCAL
+        build_fw2_dbs(portion="all", priority_cfgs=fw2_priority_cfgs)
+    elif cargs.fw_version == "fineweb":
+        build_fw_dbs(
+            priority_dumps=[
+                "CC-MAIN-2019-30",
+                "CC-MAIN-2020-05",
+                "CC-MAIN-2021-04",
+                "CC-MAIN-2022-05",
+                "CC-MAIN-2023-06",
+                "CC-MAIN-2024-51",
+                "CC-MAIN-2025-05",
+                "CC-MAIN-2024-46",
+            ],
+        )
+    else:
+        raise ValueError(f"Unknown fineweb version: {cargs.fw_version}")

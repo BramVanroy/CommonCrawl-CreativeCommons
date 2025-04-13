@@ -3,73 +3,66 @@ import shutil
 from pathlib import Path
 
 import pyarrow.parquet as pq
-import tldextract
-from datasets import Features, load_dataset
-from datasets.arrow_dataset import Dataset
-from huggingface_hub.hf_api import upload_file
+from datasets import Dataset, Features
+from huggingface_hub import create_repo, list_repo_files, upload_file
 
 from commoncrawl_cc_annotation.data_utils import yield_repo_parquet_files
 from commoncrawl_cc_annotation.script_utils import SCHEMA_NULLABLE
 
 
-no_cache_extract = tldextract.TLDExtract(cache_dir=None)
-
-
-def main(
-    dataset_name: str = "BramVanroy/CommonCrawl-CreativeCommons",
-    skip_dumps: list[str] = None,
-    only_dumps: list[str] = None,
-    num_proc: int | None = None,
-):
+def main(skip_dumps: list[str] = None, only_dumps: list[str] = None, num_proc: int | None = None, overwrite: bool = False):
     """
-    Remove rows with domains that are known to be C&D'd from the CommonCrawl-CreativeCommons dataset.
-    These domains are saved in BramVanroy/finewebs-copyright-domains.
+    Filter rows on licenses, remove wiki, non-commercial, and unknown licenses and
+    on whether or not they are in FineWeb(-2). This is a post-processing step to
+    create a recommended dataset for the CommonCrawl-CreativeCommons dataset.
 
     Args:
-        dataset_name (str): The name of the dataset to process.
         skip_dumps (list[str]): List of dumps to skip.
         only_dumps (list[str]): List of dumps to process.
         num_proc (int | None): Number of processes to use for multiprocessing.
     """
-    ds_domains = load_dataset("BramVanroy/finewebs-copyright-domains", split="train")
-    remove_domains = set(ds_domains.unique("domain"))
-    del ds_domains
-    print("Domains to remove:")
-    print(remove_domains)
-
-    tmp_dir = Path(__file__).parents[2] / "tmp" / "remove_domains"
+    tmp_dir = Path(__file__).parents[2] / "tmp" / "create_recommended"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     tmp_dir = str(tmp_dir)
 
+    orig_dataset_name = "BramVanroy/CommonCrawl-CreativeCommons"
+    filter_dataset_name = "BramVanroy/CommonCrawl-CreativeCommons-hq"
+
+    create_repo(
+        repo_id=filter_dataset_name,
+        repo_type="dataset",
+        private=True,
+        exist_ok=True,
+    )
+
+    all_repo_files = list_repo_files(filter_dataset_name, repo_type="dataset")
+
     for remote_parquet_uri, local_fname in yield_repo_parquet_files(
-        dataset_name,
+        orig_dataset_name,
         tmp_dir=tmp_dir,
         only_dumps=only_dumps,
         skip_dumps=skip_dumps,
+        skip_files_with_suffix=[] if overwrite else all_repo_files,
+        skip_non_fineweb_dumps=True,
     ):
         features = Features.from_arrow_schema(SCHEMA_NULLABLE)
         ds = Dataset.from_parquet(local_fname, features=features)
-        num_items = len(ds)
 
-        def get_domain(url):
-            extracted = no_cache_extract(url)
-            return {"domain": f"{extracted.domain}.{extracted.suffix}"}
+        filter_kwargs = {
+            "function": lambda x: (
+                (not x["license_disagreement"])  # Only use pages with a consistent license
+                and x["found_in_fw"]  # Only use pages that are in FineWeb(-2)
+                and "nc" not in x["license_abbr"]  # Exclude non-commercial licenses
+                and x["license_abbr"] != "cc-unknown"  # Exclude unknown licenses
+                and "wiki" not in x["url"]  # Exclude Wiki-like pages (best to get those from a more reliable parser)
+            ),
+            "desc": "Filtering",
+            "num_proc": num_proc,
+        }
 
-        ds = ds.map(get_domain, num_proc=num_proc, input_columns=["url"], desc="Extracting domains")
-        ds = (
-            ds.filter(
-                lambda domain: domain not in remove_domains,
-                input_columns=["domain"],
-                desc="Filtering out removed domains",
-                num_proc=num_proc,
-            )
-            .remove_columns("domain")
-            .cast(features=features)
-        )
-        new_num_items = len(ds)
+        ds = ds.filter(**filter_kwargs)
 
-        if new_num_items < num_items:
-            print(f"Removed {num_items - new_num_items} rows with removed domains in {local_fname}")
+        if len(ds) > 0:
             ds.to_parquet(local_fname)
             # Test that the modified files can indeed be read correctly now with the right schema
             try:
@@ -84,8 +77,8 @@ def main(
                         path_or_fileobj=local_fname,
                         path_in_repo=remote_parquet_uri,
                         repo_type="dataset",
-                        repo_id=dataset_name,
-                        commit_message="Remove rows with C&D domains",
+                        repo_id=filter_dataset_name,
+                        commit_message="Filter on high-quality, high-certainty CC licenses",
                     )
                 except Exception as exc:
                     num_retries -= 1
@@ -95,7 +88,7 @@ def main(
                 else:
                     break
         else:
-            print(f"No rows with removed domains in {local_fname}")
+            print(f"No items left after filtering in {local_fname}. Skipping upload...")
 
         os.unlink(local_fname)
 
@@ -108,7 +101,7 @@ if __name__ == "__main__":
 
     cparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Remove rows with domains that are known to be C&D'd from the CommonCrawl-CreativeCommons dataset",
+        description="Filter rows on licenses, remove wiki, non-commercial, and unknown licenses",
     )
     cparser.add_argument(
         "--skip-dumps",
@@ -129,20 +122,12 @@ if __name__ == "__main__":
         default=None,
         help="Number of processes to use for multiprocessing (default: None)",
     )
+    cparser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing files in the remote dataset,"
+          "i.e. reprocess the ones that are already in the HQ version",
+    )
 
     cli_kwargs = vars(cparser.parse_args())
     main(**cli_kwargs)
-
-"""
-Done:
-CC-MAIN-2019-30
-CC-MAIN-2020-05
-CC-MAIN-2023-06
-CC-MAIN-2024-51
-CC-MAIN-2024-46
-CC-MAIN-2025-05
-
-TODO:
-CC-MAIN-2021-04
-CC-MAIN-2022-05
-"""
