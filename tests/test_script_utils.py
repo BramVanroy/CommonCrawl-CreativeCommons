@@ -50,7 +50,7 @@ def test_get_dumps_with_duckdb(
     dump_name, ignore_duckdb_for, languages, expected_ignore_duckdb_for, expected_ignore_all_duckdb
 ):
     result_ignore_duckdb_for, result_ignore_all_duckdb = get_dumps_with_duckdb(
-        dump_name, ignore_duckdb_for, languages
+        dump_name, languages, ignore_duckdb_for
     )
     assert set(result_ignore_duckdb_for) == set(expected_ignore_duckdb_for)
     assert result_ignore_all_duckdb == expected_ignore_all_duckdb

@@ -346,7 +346,7 @@ def build_upload_pipeline(jsonl_path: str, output_path: str, hf_repo: str, limit
 
 
 def get_dumps_with_duckdb(
-    dump_name: str, ignore_duckdb_for: list[str], languages: list[str]
+    dump_name: str, languages: list[str], ignore_duckdb_for: list[str] = None
 ) -> tuple[list[str], bool]:
     """
     Get the list of languages that should be ignored when querying the DuckDB databases.
@@ -371,7 +371,7 @@ def get_dumps_with_duckdb(
     ignore_duckdb_for = ignore_duckdb_for or []
 
     if dump_year > 2024 or (dump_year == 2024 and dump_issue > 18):
-        ignore_duckdb_for += [lang for lang in languages if lang != "eng_Latn"]
+        ignore_duckdb_for += [lang for lang in languages if lang not in ["eng_Latn", "eng"]]
 
     # FW1 v1.3 contains data up to 2024-51
     if dump_year > 2024 or (dump_year == 2024 and dump_issue > 51):
@@ -407,8 +407,8 @@ def download_duckdbs(dump_name: str, fw_duckdb_path: str, cfg: BaseConfig) -> tu
 
     ignore_duckdb_for, ignore_all_duckdb = get_dumps_with_duckdb(
         dump_name,
-        cfg.ignore_duckdb_for,
         cfg.languages,
+        cfg.ignore_duckdb_for,
     )
 
     # Only download languages that are not in ignore_duckdb_for (occurs when crawl is too recent or in config ignore_duckdb_for)
