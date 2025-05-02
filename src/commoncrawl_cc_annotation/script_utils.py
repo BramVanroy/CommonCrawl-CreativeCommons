@@ -76,6 +76,8 @@ class SlurmConfig(BaseConfig):
     containment_mem_per_cpu_gb: int = 4
     main_cpus_per_task: int = 1
     containment_cpus_per_task: int = 16
+    max_array_launch_parallel: bool = False
+    stagger_max_array_jobs: int = 600
 
 
 def build_main_pipeline(
