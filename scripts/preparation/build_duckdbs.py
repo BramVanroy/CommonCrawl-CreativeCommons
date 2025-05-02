@@ -158,7 +158,7 @@ def build_fw2_dbs(
 
     fw2_tmp_dir = Path(__file__).parents[2] / "tmp" / "fineweb-2"
     fw2_tmp_dir.mkdir(parents=True, exist_ok=True)
-    local_duckdb_root = Path(__file__).parents[2] / "duckdbs" / "fineweb-2" 
+    local_duckdb_root = Path(__file__).parents[2] / "duckdbs" / "fineweb-2"
     local_duckdb_root.mkdir(parents=True, exist_ok=True)
 
     for cfg in get_dataset_config_names(dataset_name):
@@ -253,7 +253,7 @@ def build_fw_dbs(overwrite: bool = False, skip_dumps: list[str] = None, priority
 
     fw_tmp_dir = Path(__file__).parents[2] / "tmp" / "fineweb"
     fw_tmp_dir.mkdir(parents=True, exist_ok=True)
-    local_duckdb_root = Path(__file__).parents[2] / "duckdbs" / "fineweb" 
+    local_duckdb_root = Path(__file__).parents[2] / "duckdbs" / "fineweb"
     local_duckdb_root.mkdir(parents=True, exist_ok=True)
 
     print("Dump names")
@@ -329,11 +329,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Build DuckDBs for the fineweb datasets")
-    parser.add_argument(
-        "--fw-version",
-        choices=["fineweb-2", "fineweb"],
-        required=True
-    )
+    parser.add_argument("--fw-version", choices=["fineweb-2", "fineweb"], required=True)
     cargs = parser.parse_args()
     if cargs.fw_version == "fineweb-2":
         fw2_priority_cfgs = [f"{c}_removed" for c in KEEP_LOCAL] + KEEP_LOCAL

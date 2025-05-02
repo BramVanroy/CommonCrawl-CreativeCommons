@@ -10,7 +10,9 @@ from commoncrawl_cc_annotation.data_utils import yield_repo_parquet_files
 from commoncrawl_cc_annotation.script_utils import SCHEMA_NULLABLE
 
 
-def main(skip_dumps: list[str] = None, only_dumps: list[str] = None, num_proc: int | None = None, overwrite: bool = False):
+def main(
+    skip_dumps: list[str] = None, only_dumps: list[str] = None, num_proc: int | None = None, overwrite: bool = False
+):
     """
     Filter rows on licenses, remove wiki, non-commercial, and unknown licenses and
     on whether or not they are in FineWeb(-2). This is a post-processing step to
@@ -126,7 +128,7 @@ if __name__ == "__main__":
         "--overwrite",
         action="store_true",
         help="Overwrite existing files in the remote dataset,"
-          "i.e. reprocess the ones that are already in the HQ version",
+        "i.e. reprocess the ones that are already in the HQ version",
     )
 
     cli_kwargs = vars(cparser.parse_args())
