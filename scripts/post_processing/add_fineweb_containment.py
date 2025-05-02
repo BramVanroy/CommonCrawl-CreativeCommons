@@ -54,7 +54,7 @@ def main(dump: str, fw_duckdb_tmpl: str, fw2_duckdb_tmpl: str, overwrite: bool =
     - Renaming the `found_in_fw2` column to `found_in_fw` if it exists
     - Adding the `found_in_fw` column if it does not exist
     - Filling the `found_in_fw` column with True/False values based on the containment in FineWeb(-2)
-    2. Add `found_in_fw` column to the dataset if it does not exist and fill it with True/False 
+    2. Add `found_in_fw` column to the dataset if it does not exist and fill it with True/False
     values based on the containment in FineWeb(-2)
 
     Dumps that are too recent to be in FineWeb(-2) are set to None.
@@ -94,7 +94,7 @@ def main(dump: str, fw_duckdb_tmpl: str, fw2_duckdb_tmpl: str, overwrite: bool =
             new_cols = ["found_in_fw" if col == "found_in_fw2" else col for col in table.column_names]
             table = table.rename_columns(new_cols)
             changed_column_names = True
-        
+
         if "found_in_fw" in table.column_names and overwrite:
             print(f"Overwriting {pf}: dropping `found_in_fw` column")
             table = table.drop(["found_in_fw"])
