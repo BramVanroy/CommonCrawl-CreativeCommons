@@ -53,7 +53,6 @@ Based on these criteria, the "best guessed" license is picked as the one in the 
 - language_score: the language identification confidence score
 - found_in_fw: whether this sample was found in FineWeb(-2). For non-English, crawls that are more recent than FW2 (everything after 2024-18) is marked as None. For English, crawls that are more recent than FW v1.3 is marked as None (after 2024-51).
 
-
 ## Installation
 
 Simply pip install this repository. E.g., for an editable install:
@@ -102,12 +101,11 @@ Output of the first step will be saved, by default, in `output-main/` and the fi
 Hugging Face publicly keeps track of cease-and-desists they have received, including for domains that were removed from FineWeb(-2). I collect those domains in [this repository](BramVanroy/finewebs-copyright-domains), which in turn allows us to filter out these offending domains from our dataset. From v1.3.0 of this library, the process is done automatically. For data that has been processed with an earlier version, a [utility script](scripts/post_processing/remove_copyrighted_domains.py) is provided, which will filter
 out offending domains on a per-parquet-file basis.
 
-## Analysis 
+## Analysis
 
 ### Finding top domains that are NOT CC-BY
 
 In addition to the CC-BY dataset, you may wish to figure out which domains are NOT in it, so you can contact domain owners individually to strike an agreement about using their data. With the script [scripts/analysis/find_top_domains.py](scripts/analysis/find_top_domains.py), we first get all domains found in a specific language's FineWeb-2 dataset, including the `_removed` portion. Then all domains that are present in the CC-BY dataset are removed from that initial set. Obviously this approach has issues: the CC-BY dataset does not contain the same crawls as FW2, so the potential coverage is different. Still, the results provide *some* insight into popular domains that were not (yet) found in the CC-BY data.
-
 
 ## Progress
 
@@ -144,7 +142,7 @@ If you use or modify [the software](https://github.com/BramVanroy/CommonCrawl-Cr
 
 ## Acknowledgments
 
-- The [Common Crawl](https://commoncrawl.org/) non-profit organization. 
+- The [Common Crawl](https://commoncrawl.org/) non-profit organization.
 - [TNO](https://www.tno.nl/nl/), who funded the work hours to accomplish this code. They intend to use (parts of) [the generated material](https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons) for the [GPT-NL project](https://gpt-nl.nl/).
 - [Flemish Supercomputer Center](https://www.vscentrum.be/) for part of the compute under grant 2024-107
 - Guilherme Penedo ([@guipenedo](https://huggingface.co/guipenedo)) and the rest of the [FineWeb](https://huggingface.co/datasets/HuggingFaceFW/fineweb) and [datatrove](https://github.com/huggingface/datatrove) team for the help and insights
