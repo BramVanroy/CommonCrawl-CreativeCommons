@@ -1,4 +1,4 @@
-# Creative Commons License annotation of Common Crawl
+# Software related to the Common Crawl Creative Commons Corpus (C5)
 
 > *Raw Common Crawl crawls, annotated with potential Creative Commons license information*
 
@@ -104,10 +104,6 @@ out offending domains on a per-parquet-file basis.
 
 ## Analysis 
 
-### Document and token statistics
-
-You may be curious to get some document and token statistics. This could as well be implemented in datatrove, but I tend to do these steps on a separate, more locally accessible machine, so it's written as a separate script here. Running [scripts/analysis/find_docs_tokens_counts.py](scripts/analysis/find_docs_tokens_counts.py) will print out one row per crawl, with as columns the tokens/documents per language.
-
 ### Finding top domains that are NOT CC-BY
 
 In addition to the CC-BY dataset, you may wish to figure out which domains are NOT in it, so you can contact domain owners individually to strike an agreement about using their data. With the script [scripts/analysis/find_top_domains.py](scripts/analysis/find_top_domains.py), we first get all domains found in a specific language's FineWeb-2 dataset, including the `_removed` portion. Then all domains that are present in the CC-BY dataset are removed from that initial set. Obviously this approach has issues: the CC-BY dataset does not contain the same crawls as FW2, so the potential coverage is different. Still, the results provide *some* insight into popular domains that were not (yet) found in the CC-BY data.
@@ -117,10 +113,22 @@ In addition to the CC-BY dataset, you may wish to figure out which domains are N
 
 See [the dataset page](https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons).
 
-
 ## Citation
 
-If you use this library or data that was created with it, please cite:
+In the current absence of a publication, please cite [the dataset](https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons) as follows. Including a footnote url to this page is also appreciated!
+
+```bibtex
+@misc{vanroy2025C5,
+	author       = { Bram Vanroy },
+	title        = { CommonCrawl CreativeCommons Corpus (C5) },
+	year         = 2025,
+	url          = { https://huggingface.co/datasets/BramVanroy/CommonCrawl-CreativeCommons },
+	doi          = { 10.57967/hf/5340 },
+	publisher    = { Hugging Face }
+}
+```
+
+If you use or modify [the software](https://github.com/BramVanroy/CommonCrawl-CreativeCommons), please cite:
 
 ```bibtex
 @software{Vanroy_CommonCrawl-CreativeCommons_2025,
@@ -133,7 +141,6 @@ If you use this library or data that was created with it, please cite:
   year = {2025}
 }
 ```
-
 
 ## Acknowledgments
 
