@@ -1,7 +1,5 @@
 main_tasks: 16
 main_workers: 16
-containment_tasks: 8
-containment_workers: 8
 fw2_duckdb_templ_path: duckdbs/fineweb-2/fw2-{language}.duckdb
 fw_duckdb_templ_path: duckdbs/fineweb/fw-{dump}.duckdb
 limit: 1000
