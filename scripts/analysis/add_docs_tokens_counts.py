@@ -110,7 +110,9 @@ def get_stats(num_proc: int | None = None, force_overwrite: bool = False) -> Non
             repo_type="dataset",
         )
         shutil.rmtree(CACHE_DIR / cfg)
-        print(f"Counted {cfg} ({results['detailed'][cfg]['num_docs']} docs, {results['detailed'][cfg]['num_tokens']} tokens)")
+        print(
+            f"Counted {cfg} ({results['detailed'][cfg]['num_docs']} docs, {results['detailed'][cfg]['num_tokens']} tokens)"
+        )
 
 
 if __name__ == "__main__":
