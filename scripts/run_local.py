@@ -78,12 +78,18 @@ if __name__ == "__main__":
         required=True,
         help="CommonCrawl dump, e.g. 'CC-MAIN-2024-51' (see https://commoncrawl.org/overview)",
     )
-    cparser.add_argument("-o", "--output_path", type=str, required=True, help="Output path")
     cparser.add_argument(
         "-c",
         "--pipelines_config",
         type=str,
         help="Path to the pipelines YAML config file.",
+    )
+    cparser.add_argument(
+        "-o",
+        "--output_path",
+        default="output/",
+        type=str,
+        help="Output path for the pipeline. Output will be saved in a subdirectory named after the dump.",
     )
 
     cli_kwargs = vars(cparser.parse_args())
