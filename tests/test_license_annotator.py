@@ -29,28 +29,49 @@ def test_parse_cc_license_url(license_url, expected_abbr, expected_version):
 @pytest.mark.parametrize(
     "html,expected",
     [
+        # No license
         (
             "<html><head></head><body>No license here</body></html>",
             []
         ),
+        # License in meta tag
         (
             """<html><head><meta name="license" content="https://creativecommons.org/licenses/by-nc-nd/4.0/"></head></html>""",
             [License(abbr="by-nc-nd", version="4.0", location="meta_tag", in_head=True, in_footer=False)]
         ),
+        # License in meta tag (cased)
+        (
+            """<html><head><META NAME="LICENSE" CONTENT="https://creativecommons.org/licenses/by-nc/3.0/"></head></html>""",
+            [License(abbr="by-nc", version="3.0", location="meta_tag", in_head=True, in_footer=False)]
+        ),
+        # License in link tag
         (
             """<html><head><link href="https://creativecommons.org/licenses/by/3.0/"></head></html>""",
             [License(abbr="by", version="3.0", location="link_tag", in_head=True, in_footer=False)]
         ),
+        # License in link tag (cased)
         (
-            """<html><footer><a href="https://creativecommons.org/licenses/by-sa/2.0/"></a></footer></html>""",
+            """<html><head><LINK HREF="https://creativecommons.org/licenses/by/3.0/"></head></html>""",
+            [License(abbr="by", version="3.0", location="link_tag", in_head=True, in_footer=False)]
+        ),
+        # License in a tag
+        (
+            """<html><body><footer><a href="https://creativecommons.org/licenses/by-sa/2.0/"></a></footer></body></html>""",
             [License(abbr="by-sa", version="2.0", location="a_tag", in_head=False, in_footer=True)]
         ),
+        # License in a tag (cased)
+        (
+            """<html><body><FOOTER><A HREF="https://creativecommons.org/licenses/by-sa/2.0/"></A></FOOTER></body></html>""",
+            [License(abbr="by-sa", version="2.0", location="a_tag", in_head=False, in_footer=True)]
+        ),
+        # License in JSON-LD
         (
             """<html><body><script type="application/ld+json">
             {"@context":"http://schema.org","license":"https://creativecommons.org/licenses/by-nd/4.0/"}
             </script></body/html>""",
             [License(abbr="by-nd", version="4.0", location="json-ld", in_head=False, in_footer=False)]
         ),
+        # License in multiple locations
         (
             """<html>
             <head><meta name="license" content="https://creativecommons.org/licenses/zero/1.0/"></head>
@@ -59,13 +80,55 @@ def test_parse_cc_license_url(license_url, expected_abbr, expected_version):
             [License(abbr="zero", version="1.0", location="meta_tag", in_head=True, in_footer=False),
              License(abbr="by", version="4.0", location="a_tag", in_head=False, in_footer=False)]
         ),
+        # Invalid license URL
         (
             """<html><body><a href="https://example.com/licenses/by-nc-nd/4.0/"></a></body></html>""",
             []
         ),
+        # License with unknown version
         (
             """<html><body><a href="https://creativecommons.org/licenses/unknown/2.0/"></a></body></html>""",
             [License(abbr="cc-unknown", version=None, location="a_tag", in_head=False, in_footer=False)]
+        ),
+        # License in footer element
+        (
+            """<html><body><footer><a href="https://creativecommons.org/licenses/by-nc-nd/4.0/"></a></footer></body></html>""",
+            [License(abbr="by-nc-nd", version="4.0", location="a_tag", in_head=False, in_footer=True)]
+        ),        
+        # License in footer element (cased)
+        (
+            """<html><body><FOOTER><a href="https://creativecommons.org/licenses/by-nc-nd/4.0/"></a></FOOTER></body></html>""",
+            [License(abbr="by-nc-nd", version="4.0", location="a_tag", in_head=False, in_footer=True)]
+        ),
+        # License in json-ld as a dict
+        (
+            """<html><body><script type="application/ld+json">
+            {"@context":"http://schema.org","license":{"url":"https://creativecommons.org/licenses/by-nd/4.0/"}}
+            </script></body></html>""",
+            [License(abbr="by-nd", version="4.0", location="json-ld", in_head=False, in_footer=False)]
+        ),
+        # License in json-ld as a list
+        (
+            """<html><body><script type="application/ld+json">
+            {"@context":"http://schema.org","license":[{"url":"https://creativecommons.org/licenses/by-nd/4.0/"}]}
+            </script></body></html>""",
+            [License(abbr="by-nd", version="4.0", location="json-ld", in_head=False, in_footer=False)]
+        ),
+        # License in json-ld as a list with multiple licenses
+        (
+            """<html><body><script type="application/ld+json">
+            {"@context":"http://schema.org","license":[{"url":"https://creativecommons.org/licenses/by-nd/4.0/"},{"url":"https://creativecommons.org/licenses/by/3.0/"}]}
+            </script></body></html>""",
+            [License(abbr="by-nd", version="4.0", location="json-ld", in_head=False, in_footer=False),
+             License(abbr="by", version="3.0", location="json-ld", in_head=False, in_footer=False)]
+        ),
+
+        # License in json-ld as a dict (cased)
+        (
+            """<html><body><SCRIPT TYPE="APPLICATION/LD+JSON">
+            {"@context":"http://schema.org","LICENSE":{"url":"https://creativecommons.org/licenses/by-nd/4.0/"}}
+            </SCRIPT></body></html>""",
+            [License(abbr="by-nd", version="4.0", location="json-ld", in_head=False, in_footer=False)]
         ),
     ],
 )
