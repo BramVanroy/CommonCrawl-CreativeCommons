@@ -257,7 +257,7 @@ def sort_licenses(
         location, whether it was found in the head, and whether it was found in the footer
 
     Returns:
-        list[tuple[str, str, str, bool, bool]]: the sorted list of license results
+        list[License]: the sorted list of license results
     """
     return sorted(
         results,
