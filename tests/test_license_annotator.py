@@ -46,9 +46,9 @@ def test_parse_cc_license_url(license_url, expected_abbr, expected_version):
             [("by-sa", "2.0", "a_tag", False, True)]
         ),
         (
-            """<html><script type="application/ld+json">
+            """<html><body><script type="application/ld+json">
             {"@context":"http://schema.org","license":"https://creativecommons.org/licenses/by-nd/4.0/"}
-            </script></html>""",
+            </script><></body/html>""",
             [("by-nd", "4.0", "json-ld", False, False)]
         ),
         (

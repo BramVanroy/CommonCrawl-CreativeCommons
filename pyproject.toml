@@ -30,7 +30,7 @@ classifiers = [
 
 requires-python = ">=3.10"
 dependencies = [
-    "beautifulsoup4",
+    "beautifulsoup4>=4.7.0",
     "datasets",
     "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/huggingface/datatrove@b9fb72a21350fd9ed13a115a6d24ea5f58015ae7",
     "duckdb",

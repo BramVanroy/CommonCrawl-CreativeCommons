@@ -178,6 +178,7 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
                 results.append((license_abbr, license_version, license_place, in_head, in_footer))
 
     # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
+    # TODO improve speed with CSS selectors?
     for meta_tag in soup.find_all("meta"):
         meta_name = meta_tag.get("name", "") or meta_tag.get("property", "")
         if meta_name.lower() in ["license", "og:license"]:
