@@ -1,5 +1,5 @@
 import pytest
-from commoncrawl_cc_annotation.components.annotators.license_annotator import parse_cc_license_url, find_cc_licenses_in_html, sort_licenses
+from commoncrawl_cc_annotation.components.annotators.license_annotator import License, parse_cc_license_url, find_cc_licenses_in_html, sort_licenses
 
 
 @pytest.mark.parametrize(
@@ -35,28 +35,29 @@ def test_parse_cc_license_url(license_url, expected_abbr, expected_version):
         ),
         (
             """<html><head><meta name="license" content="https://creativecommons.org/licenses/by-nc-nd/4.0/"></head></html>""",
-            [("by-nc-nd", "4.0", "meta_tag", True, False)]
+            [License(abbr="by-nc-nd", version="4.0", location="meta_tag", in_head=True, in_footer=False)]
         ),
         (
             """<html><head><link href="https://creativecommons.org/licenses/by/3.0/"></head></html>""",
-            [("by", "3.0", "link_tag", True, False)]
+            [License(abbr="by", version="3.0", location="link_tag", in_head=True, in_footer=False)]
         ),
         (
             """<html><footer><a href="https://creativecommons.org/licenses/by-sa/2.0/"></a></footer></html>""",
-            [("by-sa", "2.0", "a_tag", False, True)]
+            [License(abbr="by-sa", version="2.0", location="a_tag", in_head=False, in_footer=True)]
         ),
         (
             """<html><body><script type="application/ld+json">
             {"@context":"http://schema.org","license":"https://creativecommons.org/licenses/by-nd/4.0/"}
-            </script><></body/html>""",
-            [("by-nd", "4.0", "json-ld", False, False)]
+            </script></body/html>""",
+            [License(abbr="by-nd", version="4.0", location="json-ld", in_head=False, in_footer=False)]
         ),
         (
             """<html>
             <head><meta name="license" content="https://creativecommons.org/licenses/zero/1.0/"></head>
             <body><a href="https://creativecommons.org/licenses/by/4.0/"></a></body>
             </html>""",
-            [("zero", "1.0", "meta_tag", True, False), ("by", "4.0", "a_tag", False, False)]
+            [License(abbr="zero", version="1.0", location="meta_tag", in_head=True, in_footer=False),
+             License(abbr="by", version="4.0", location="a_tag", in_head=False, in_footer=False)]
         ),
         (
             """<html><body><a href="https://example.com/licenses/by-nc-nd/4.0/"></a></body></html>""",
@@ -64,7 +65,7 @@ def test_parse_cc_license_url(license_url, expected_abbr, expected_version):
         ),
         (
             """<html><body><a href="https://creativecommons.org/licenses/unknown/2.0/"></a></body></html>""",
-            [("cc-unknown", None, "a_tag", False, False)]
+            [License(abbr="cc-unknown", version=None, location="a_tag", in_head=False, in_footer=False)]
         ),
     ],
 )
@@ -77,35 +78,36 @@ def test_find_cc_licenses_in_html(html, expected):
     [
         # Single item
         (
-            [("by", "3.0", "meta_tag", True, False)],
-            [("by", "3.0", "meta_tag", True, False)],
+            [License(abbr="by", version="3.0", location="meta_tag", in_head=True, in_footer=False)],
+            [License(abbr="by", version="3.0", location="meta_tag", in_head=True, in_footer=False)]
         ),
         # Different locations
         (
             [
-                ("by", "4.0", "link_tag", True, False),
-                ("by-nc-nd", "4.0", "meta_tag", False, False),
-                ("by-sa", "3.0", "a_tag", False, False),
-                ("zero", "1.0", "json-ld", False, False),
+                License(abbr="by", version="4.0", location="link_tag", in_head=True, in_footer=False),
+                License(abbr="by-nc-nd", version="4.0", location="meta_tag", in_head=False,in_footer= False),
+                License(abbr="by-sa", version="3.0", location="a_tag", in_head=False, in_footer=False),
+                License(abbr="zero", version="1.0", location="json-ld", in_head=False, in_footer=False),
             ],
             [
-                ("by-nc-nd", "4.0", "meta_tag", False, False),
-                ("zero", "1.0", "json-ld", False, False),
-                ("by", "4.0", "link_tag", True, False),
-                ("by-sa", "3.0", "a_tag", False, False),
+                License(abbr="by-nc-nd", version="4.0", location="meta_tag", in_head=False, in_footer=False),
+                License(abbr="zero", version="1.0", location="json-ld", in_head=False, in_footer=False),
+                License(abbr="by", version="4.0", location="link_tag", in_head=True, in_footer=False),
+                License(abbr="by-sa", version="3.0", location="a_tag", in_head=False, in_footer=False),
             ],
         ),
         # Same location, different head/footer
         (
             [
-                ("by-nc-sa", "3.0", "link_tag", False, True),
-                ("by-nc", "4.0", "link_tag", True, False),
-                ("by-nd", "4.0", "link_tag", False, False),
+                License(abbr="by-nc-sa", version="3.0", location="link_tag", in_head=False, in_footer=True),
+                License(abbr="by-nc", version="4.0", location="link_tag", in_head=True, in_footer=False),
+                License(abbr="by-nd", version="4.0", location="link_tag", in_head=False, in_footer=False),
+                
             ],
             [
-                ("by-nc", "4.0", "link_tag", True, False),
-                ("by-nc-sa", "3.0", "link_tag", False, True),
-                ("by-nd", "4.0", "link_tag", False, False),
+                License(abbr="by-nc", version="4.0", location="link_tag", in_head=True, in_footer=False),
+                License(abbr="by-nc-sa", version="3.0", location="link_tag", in_head=False, in_footer=True),
+                License(abbr="by-nd", version="4.0", location="link_tag", in_head=False, in_footer=False),
             ],
         ),
     ],

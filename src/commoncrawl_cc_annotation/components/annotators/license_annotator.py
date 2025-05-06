@@ -1,7 +1,7 @@
 import json
 import re
 import warnings
-from typing import Literal
+from typing import Literal, NamedTuple
 from urllib.parse import unquote
 
 from datatrove.data import Document
@@ -92,6 +92,14 @@ footer_preference_order = [True, False]
 license_tuple_keys = ("abbr", "version", "location", "in_head", "in_footer")
 
 
+class License(NamedTuple):
+    abbr: abbr_type
+    version: str | None
+    location: location_type
+    in_head: bool
+    in_footer: bool
+
+
 def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None]:
     """Given a URL that might be from creativecommons.org, try to parse out the license type and version.
 
@@ -136,14 +144,14 @@ class ParserException(Exception):
         super().__init__(message_or_exception)
 
 
-def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, location_type, bool, bool]]:
+def find_cc_licenses_in_html(html: str) -> list[License]:
     """Given an HTML document (as str), try to find all Creative Commons licenses, if any.
 
     Args:
         html: the HTML document as a string
 
     Returns:
-        list[tuple[str, str, str, bool, bool]]: a list of tuples with the license abbreviation, version, location,
+        list[License]: a list of Licnse NamedTuples, with the license abbreviation, version, location,
         whether it was found in the head, and whether it was found in the footer
     """
     from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning, Tag, XMLParsedAsHTMLWarning
@@ -174,8 +182,15 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
             license_abbr, license_version = parse_cc_license_url(potential_cc_url)
             if license_abbr:
                 in_head, in_footer = has_head_or_footer_ancestor(tag)
-                # These options are mutually exclusive
-                results.append((license_abbr, license_version, license_place, in_head, in_footer))
+                results.append(
+                    License(
+                        abbr=license_abbr,
+                        version=license_version,
+                        location=license_place,
+                        in_head=in_head,
+                        in_footer=in_footer,
+                    )
+                )
 
     # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
     # TODO improve speed with CSS selectors?
@@ -230,8 +245,8 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
 
 
 def sort_licenses(
-    results: list[tuple[abbr_type, str | None, location_type, bool, bool]],
-) -> list[tuple[abbr_type, str | None, location_type, bool, bool]]:
+    results: list[License],
+) -> list[License]:
     """Sort the license results (list of tuples) by the following order of preference for each item in the tuple:
     1. location_preference_order: meta_tag, json-ld, link_tag, a_tag
     2. head_preference_order: True, False
@@ -247,9 +262,9 @@ def sort_licenses(
     return sorted(
         results,
         key=lambda lic: (
-            location_preference_order.index(lic[2]),
-            head_preference_order.index(lic[3]),
-            footer_preference_order.index(lic[4]),
+            location_preference_order.index(lic.location),
+            head_preference_order.index(lic.in_head),
+            footer_preference_order.index(lic.in_footer),
         ),
     )
 
