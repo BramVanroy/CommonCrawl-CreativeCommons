@@ -156,15 +156,18 @@ def find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, loc
 
     results = []
     try:
-        soup = BeautifulSoup(html, "html.parser")
-    except Exception:
+        # Default to lxml parser if available, which is fastest
+        soup = BeautifulSoup(html, "lxml")
+    except Exception as e_lxml:
         try:
-            soup = BeautifulSoup(html, "html5lib")
-        except Exception:
+            soup = BeautifulSoup(html, "html.parser")
+        except Exception as e_htmlparser:
             try:
-                soup = BeautifulSoup(html, "lxml")
-            except Exception:
-                raise ParserException("Could not parse the document with html.parser, html5lib, nor lxml.")
+                soup = BeautifulSoup(html, "html5lib")
+            except Exception as e_html5lib:
+                raise ParserException(
+                    f"Failed with lxml and html.parser. lxml error: {e_lxml}, html.parser error: {e_htmlparser}, html5lib error: {e_html5lib}"
+                )
 
     def parse_content_license(potential_cc_url: str, license_place: str, tag: Tag):
         if potential_cc_url:
