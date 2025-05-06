@@ -4,6 +4,7 @@ import warnings
 from typing import Literal, NamedTuple
 from urllib.parse import unquote
 
+from bs4 import Tag
 from datatrove.data import Document
 
 from .base import BaseAnnotator
@@ -68,32 +69,25 @@ class LicenseAnnotator(BaseAnnotator):
         return doc
 
 
-CC_ABBR_TO_LICENSE = {
-    "by",
-    "by-sa",
-    "by-nd",
-    "by-nc",
-    "by-nc-sa",
-    "by-nc-nd",
-    "zero",
-    "certification",
-    "mark",
-}
-
-
+CC_ABBRS = {"by", "by-sa", "by-nd", "by-nc", "by-nc-sa", "by-nc-nd", "zero", "certification", "mark"}
+# Local types
 location_type = Literal["meta_tag", "a_tag", "link_tag", "json-ld"]
 abbr_type = Literal[
     "cc-unknown", "by", "by-sa", "by-nd", "by-nc", "by-nc-sa", "by-nc-nd", "zero", "certification", "mark"
 ]
-
+# Ordered preference, first one is prefered, last one is least prefered
 location_preference_order = ["meta_tag", "json-ld", "link_tag", "a_tag"]
 head_preference_order = [True, False]
 footer_preference_order = [True, False]
 license_tuple_keys = ("abbr", "version", "location", "in_head", "in_footer")
 
+# Compiled regexes
+CC_URL_REGEX = re.compile(r"creativecommons\.org/(?:licenses|publicdomain)/([^/]+)/(\d\.\d)")
+LICENSE_CODE_CLEANUP_REGEX = re.compile(r"^[^a-z]+|[^a-z]+$")
+
 
 class License(NamedTuple):
-    abbr: abbr_type
+    abbr: abbr_type | None
     version: str | None
     location: location_type
     in_head: bool
@@ -118,17 +112,17 @@ def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None
     #   https://creativecommons.org/licenses/by-nc-nd/4.0/
     # or
     #   https://creativecommons.org/publicdomain/zero/1.0/
-    match = re.search(r"creativecommons\.org/(?:licenses|publicdomain)/([^/]+)/(\d\.\d)", url_lower)
+    match = CC_URL_REGEX.search(url_lower)
 
     # "creativecommons.org" in the url but not a known license pattern
     if not match:
         return "cc-unknown", None
 
     license_code = match.group(1)  # e.g. 'by-nc-nd' or 'zero'
-    license_code = re.sub(r"^[^a-z]+|[^a-z]+$", "", license_code)
+    license_code = LICENSE_CODE_CLEANUP_REGEX.sub("", license_code)
     version = match.group(2)  # e.g. '4.0' or '1.0'
 
-    if license_code in CC_ABBR_TO_LICENSE:
+    if license_code in CC_ABBRS:
         return license_code, version
     else:
         return "cc-unknown", None
@@ -178,6 +172,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                 )
 
     def parse_content_license(potential_cc_url: str, license_place: str, tag: Tag):
+        potential_cc_url = potential_cc_url.strip()
         if potential_cc_url:
             license_abbr, license_version = parse_cc_license_url(potential_cc_url)
             if license_abbr:
@@ -193,17 +188,14 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                 )
 
     # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
-    # TODO improve speed with CSS selectors?
-    for meta_tag in soup.find_all("meta"):
-        meta_name = meta_tag.get("name", "") or meta_tag.get("property", "")
-        if meta_name.lower() in ["license", "og:license"]:
-            if content := meta_tag.get("content"):
-                parse_content_license(content, "meta_tag", meta_tag)
+    meta_css_selector = 'meta[name="license" i][content*="creativecommons.org" i], meta[property="og:license" i][content*="creativecommons.org" i]'
+    for meta_tag in soup.select(meta_css_selector):
+        parse_content_license(meta_tag["content"], "meta_tag", meta_tag)
 
     # Check <link href="..."> or <a href="..."> for its "href" attribute
-    for tag in soup.find_all(("link", "a")):
-        if href := tag.get("href"):
-            parse_content_license(href, f"{tag.name}_tag", tag)
+    link_css_selector = 'link[href*="creativecommons.org" i], a[href*="creativecommons.org" i]'
+    for tag in soup.select(link_css_selector):
+        parse_content_license(tag["href"], f"{tag.name}_tag", tag)
 
     # Check JSON-LD (Schema.org) for "license": "...", usually in <script type="application/ld+json">
     # Example JSON-LD:
@@ -216,13 +208,17 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
     #         "url": "https://creativecommons.org/licenses/by-nc-nd/4.0/"
     #     }
     # }
-    for script_tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+    script_css_selector = 'script[type="application/ld+json" i]'
+    for script_tag in soup.select(script_css_selector):
+        if not script_tag.string:
+            continue
+
         try:
-            data = json.loads(script_tag.string or "")
+            data = json.loads(script_tag.string)
         except json.JSONDecodeError:
             continue
         else:
-            # data could be a list or dict
+            # data could be a list or dict, see tests
             if isinstance(data, dict):
                 data_list = [data]
             elif isinstance(data, list):
@@ -231,22 +227,32 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                 data_list = []
 
             for item in data_list:
-                if isinstance(item, dict) and "license" in item:
-                    license_val = item["license"]
-                    # license_val might be a string or dict (if typed)
-                    if isinstance(license_val, dict):
-                        # Some schema.org usage might embed the URL in "@id" or "url"
-                        if license_url := license_val.get("@id") or license_val.get("url"):
-                            parse_content_license(license_url, "json-ld", script_tag)
-                    elif isinstance(license_val, str):
-                        parse_content_license(license_val, "json-ld", script_tag)
+                if isinstance(item, dict):
+                    license_val_candidate = item.get("license", item.get("LICENSE"))
+                    if not license_val_candidate:
+                        continue
+
+                    # Account for multiple licenses in a list
+                    if not isinstance(license_val_candidate, list):
+                        license_vals = [license_val_candidate]
+                    else:
+                        license_vals = license_val_candidate
+
+                    for license_val in license_vals:
+                        # license_val might be a string or dict (if typed)
+                        if isinstance(license_val, dict):
+                            # Some schema.org usage might embed the URL in "@id" or "url"
+                            if license_url := license_val.get(
+                                "@id", license_val.get("url", license_val.get("@ID", license_val.get("URL")))
+                            ):
+                                parse_content_license(license_url, "json-ld", script_tag)
+                        elif isinstance(license_val, str):
+                            parse_content_license(license_val, "json-ld", script_tag)
 
     return sort_licenses(results)
 
 
-def sort_licenses(
-    results: list[License],
-) -> list[License]:
+def sort_licenses(results: list[License]) -> list[License]:
     """Sort the license results (list of tuples) by the following order of preference for each item in the tuple:
     1. location_preference_order: meta_tag, json-ld, link_tag, a_tag
     2. head_preference_order: True, False
@@ -269,7 +275,7 @@ def sort_licenses(
     )
 
 
-def has_head_or_footer_ancestor(tag) -> tuple[bool, bool]:
+def has_head_or_footer_ancestor(tag: Tag | None) -> tuple[bool, bool]:
     """Check if the tag has a head ancestor or a footer ancestor. The
     options are mutually exclusive for normal HTML. The `head` cannot be in a
     `footer` element and a `footer` element cannot be in a `head` element.
@@ -281,16 +287,19 @@ def has_head_or_footer_ancestor(tag) -> tuple[bool, bool]:
         tuple[bool]: a tuple with two booleans, the first is True if the tag has a head ancestor,
         the second is True if the tag has a footer ancestor
     """
-    if tag is None:
-        return False, False
+    cur_tag = tag
+    while cur_tag is not None:
+        tag_name = cur_tag.name
+        if tag_name == "head":
+            return True, False
 
-    if tag.name.lower() == "head":
-        return True, False
-    elif (
-        tag.name.lower() == "footer"
-        or any("footer" in cls.lower() for cls in tag.get("class", []))
-        or "footer" in tag.get("id", "").lower()
-    ):
-        return False, True
+        if (
+            tag_name == "footer"
+            or "footer" in cur_tag.get("id", "").lower()
+            or any("footer" in html_cls.lower() for html_cls in cur_tag.get("class", []))
+        ):
+            return False, True
 
-    return has_head_or_footer_ancestor(tag.parent)
+        cur_tag = cur_tag.parent
+
+    return False, False
