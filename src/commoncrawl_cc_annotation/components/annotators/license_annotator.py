@@ -103,16 +103,16 @@ def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None
     Returns:
         tuple[str, str]: the license abbreviation and version, e.g. ('by-nc-nd', '4.0')
     """
-    url_lower = unquote(license_url).lower()
+    url = unquote(license_url)
 
-    if "creativecommons.org" not in url_lower:
+    if "creativecommons.org" not in url:
         return None, None
 
     # Typical CC license URLs look like:
     #   https://creativecommons.org/licenses/by-nc-nd/4.0/
     # or
     #   https://creativecommons.org/publicdomain/zero/1.0/
-    match = CC_URL_REGEX.search(url_lower)
+    match = CC_URL_REGEX.search(url)
 
     # "creativecommons.org" in the url but not a known license pattern
     if not match:
@@ -148,6 +148,12 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
         list[License]: a list of Licnse NamedTuples, with the license abbreviation, version, location,
         whether it was found in the head, and whether it was found in the footer
     """
+    # Lowercase the HTML to make it easier to parse and avoid case-sensitive issues
+    html = html.lower()
+    if not html or "creativecommons.org" not in html:
+        # No license found or no HTML to parse
+        return []
+
     from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning, Tag, XMLParsedAsHTMLWarning
 
     warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -188,12 +194,12 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                 )
 
     # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
-    meta_css_selector = 'meta[name="license" i][content*="creativecommons.org" i], meta[property="og:license" i][content*="creativecommons.org" i]'
+    meta_css_selector = 'meta[name="license"][content*="creativecommons.org"], meta[property="og:license"][content*="creativecommons.org"]'
     for meta_tag in soup.select(meta_css_selector):
         parse_content_license(meta_tag["content"], "meta_tag", meta_tag)
 
     # Check <link href="..."> or <a href="..."> for its "href" attribute
-    link_css_selector = 'link[href*="creativecommons.org" i], a[href*="creativecommons.org" i]'
+    link_css_selector = 'link[href*="creativecommons.org"], a[href*="creativecommons.org"]'
     for tag in soup.select(link_css_selector):
         parse_content_license(tag["href"], f"{tag.name}_tag", tag)
 
@@ -208,7 +214,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
     #         "url": "https://creativecommons.org/licenses/by-nc-nd/4.0/"
     #     }
     # }
-    script_css_selector = 'script[type="application/ld+json" i]'
+    script_css_selector = 'script[type="application/ld+json"]'
     for script_tag in soup.select(script_css_selector):
         if not script_tag.string:
             continue
@@ -228,7 +234,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
 
             for item in data_list:
                 if isinstance(item, dict):
-                    license_val_candidate = item.get("license", item.get("LICENSE"))
+                    license_val_candidate = item.get("license", None)
                     if not license_val_candidate:
                         continue
 
@@ -242,9 +248,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                         # license_val might be a string or dict (if typed)
                         if isinstance(license_val, dict):
                             # Some schema.org usage might embed the URL in "@id" or "url"
-                            if license_url := license_val.get(
-                                "@id", license_val.get("url", license_val.get("@ID", license_val.get("URL")))
-                            ):
+                            if license_url := license_val.get("@id", license_val.get("url", None)):
                                 parse_content_license(license_url, "json-ld", script_tag)
                         elif isinstance(license_val, str):
                             parse_content_license(license_val, "json-ld", script_tag)
@@ -295,8 +299,8 @@ def has_head_or_footer_ancestor(tag: Tag | None) -> tuple[bool, bool]:
 
         if (
             tag_name == "footer"
-            or "footer" in cur_tag.get("id", "").lower()
-            or any("footer" in html_cls.lower() for html_cls in cur_tag.get("class", []))
+            or "footer" in cur_tag.get("id", "")
+            or any("footer" in html_cls for html_cls in cur_tag.get("class", []))
         ):
             return False, True
 
