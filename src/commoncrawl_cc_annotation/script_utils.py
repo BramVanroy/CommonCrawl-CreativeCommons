@@ -118,7 +118,7 @@ def build_main_pipeline(
         LicenseAnnotator(),
         LicenseFilter(),
         Trafilatura(favour_precision=True, timeout=600.0),
-        EmptyTextFilter(),  # filter items with empty extracted text
+        EmptyTextFilter(),  # filter items with empty extracted text -- should be rare but it's cheap
         LanguageFilter(backend="glotlid", languages=languages, language_threshold=language_threshold),
         # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
