@@ -150,7 +150,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
     """
     # Lowercase the HTML to make it easier to parse and avoid case-sensitive issues
     html = html.lower()
-    if not html or "creativecommons.org" not in html:
+    if "creativecommons.org" not in html:
         # No license found or no HTML to parse
         return []
 
