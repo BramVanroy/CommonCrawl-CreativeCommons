@@ -20,8 +20,7 @@ class EmptyTextFilter(BaseFilter):
           bool | tuple[bool, str]: whether to keep the document or not, and the reason if not
 
         """
-        text = doc.text.strip()
-        if not text:
+        if not doc.text.strip():
             return False, "empty_text_property"
 
         return True
