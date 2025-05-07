@@ -207,6 +207,7 @@ def build_fw2_dbs(
             )
             config_success[cfg_name] = lang_success
         else:
+            print(f"Skipping processing {cfg_name} because the DuckDB file already exists either locally or in the remote repo")
             config_success[cfg_name] = True
 
         if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
