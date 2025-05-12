@@ -3,12 +3,12 @@ import re
 import warnings
 from typing import Literal, NamedTuple
 from urllib.parse import unquote
+from warnings import deprecated
 
 from bs4 import Tag
 from datatrove.data import Document
 
 from .base import BaseAnnotator
-from warnings import deprecated
 
 
 class LicenseAnnotator(BaseAnnotator):

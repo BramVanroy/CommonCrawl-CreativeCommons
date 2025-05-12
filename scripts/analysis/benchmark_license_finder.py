@@ -57,7 +57,7 @@ def benchmark_license_finder(tmp_dir: Path, num_iters: int = 3, limit: int = 100
                 elapsed_time = end_time - start_time
                 iter_times.append(elapsed_time)
                 iter_total_time += elapsed_time
-            
+
             avg_iter_time_per_doc = iter_total_time / len(html_strings) if html_strings else 0
             stdev_iter_time_per_doc = (
                 (sum((x - avg_iter_time_per_doc) ** 2 for x in iter_times) / len(iter_times)) ** 0.5
@@ -73,9 +73,7 @@ def benchmark_license_finder(tmp_dir: Path, num_iters: int = 3, limit: int = 100
 
         avg_time_per_doc = total_time / len(times) if times else 0
         stdev_per_doc = (sum((x - avg_time_per_doc) ** 2 for x in times) / len(times)) ** 0.5 if times else 0
-        print(
-            f"{func_name} - Avg. time/doc: {avg_time_per_doc:.4f} seconds, stdev.: {stdev_per_doc:.4f}"
-        )
+        print(f"{func_name} - Avg. time/doc: {avg_time_per_doc:.4f} seconds, stdev.: {stdev_per_doc:.4f}")
 
 
 def speed_benchmark(
@@ -147,14 +145,14 @@ if __name__ == "__main__":
     # Results: yes, lxml is less robust against malformed HTML but that's okay - we assume that high-quality websites are preferred anyway
     # We lose 3 licenses out of 10_000 and all of them from malformed HTML, i.e. license AFTER closing body tag
     speed_benchmark(limit=10_000)
-    # improved - Iter. 1/3: Avg time/doc: 0.0010s, stdev.: 0.0112, num. licenses found: 237                                                                                               
-    # improved - Iter. 2/3: Avg time/doc: 0.0009s, stdev.: 0.0104, num. licenses found: 237                                                                                               
-    # improved - Iter. 3/3: Avg time/doc: 0.0009s, stdev.: 0.0103, num. licenses found: 237                                                                                               
+    # improved - Iter. 1/3: Avg time/doc: 0.0010s, stdev.: 0.0112, num. licenses found: 237
+    # improved - Iter. 2/3: Avg time/doc: 0.0009s, stdev.: 0.0104, num. licenses found: 237
+    # improved - Iter. 3/3: Avg time/doc: 0.0009s, stdev.: 0.0103, num. licenses found: 237
     # improved - Avg. time/doc: 0.0009 seconds, stdev.: 0.0107, num. licenses found: 237
 
-    # legacy - Iter. 1/3: Avg time/doc: 0.0222s, stdev.: 0.0433, num. licenses found: 240                                                                                                 
-    # legacy - Iter. 2/3: Avg time/doc: 0.0223s, stdev.: 0.0438, num. licenses found: 240                                                                                                 
-    # legacy - Iter. 3/3: Avg time/doc: 0.0219s, stdev.: 0.0424, num. licenses found: 240                                                                                                 
+    # legacy - Iter. 1/3: Avg time/doc: 0.0222s, stdev.: 0.0433, num. licenses found: 240
+    # legacy - Iter. 2/3: Avg time/doc: 0.0223s, stdev.: 0.0438, num. licenses found: 240
+    # legacy - Iter. 3/3: Avg time/doc: 0.0219s, stdev.: 0.0424, num. licenses found: 240
     # legacy - Avg. time/doc: 0.0221 seconds, stdev.: 0.0432, num. licenses found: 240
 
     # => improved is around 20-25x faster than legacy
