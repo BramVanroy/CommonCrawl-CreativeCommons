@@ -3,10 +3,10 @@ import re
 import warnings
 from typing import Literal, NamedTuple
 from urllib.parse import unquote
-from warnings import deprecated
 
 from bs4 import Tag
 from datatrove.data import Document
+from typing_extensions import deprecated
 
 from .base import BaseAnnotator
 
