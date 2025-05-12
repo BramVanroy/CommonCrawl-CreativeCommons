@@ -14,7 +14,7 @@ from .base import BaseAnnotator
 class LicenseAnnotator(BaseAnnotator):
     name = "©️ License Annotator"
 
-    _requires_dependencies = [("bs4", "beautifulsoup4")]
+    _requires_dependencies = [("bs4", "beautifulsoup4"), "lxml", "lxml_html_clean", "html5lib"]
 
     def __init__(self, html_in_metadata: bool = False, remove_html: bool = False):
         super().__init__()
