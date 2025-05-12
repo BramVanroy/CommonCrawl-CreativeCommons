@@ -44,20 +44,20 @@ def extract_html_from_warc(warc_file_path, target_uuid):
     return None
 
 
-def main():
-    target_uuid = "<urn:uuid:d5a13e0d-1197-4f6e-bbc7-fedee55980ae>"
-    dump = "CC-MAIN-2013-20"
-    warc_path = f"crawl-data/{dump}/segments/1368702730377/warc/CC-MAIN-20130516111210-00038-ip-10-60-113-184.ec2.internal.warc.gz"
+def main(
+    target_uuid: str = "<urn:uuid:d5a13e0d-1197-4f6e-bbc7-fedee55980ae>",
+    warc_path: str = "crawl-data/CC-MAIN-2013-20/segments/1368702730377/warc/CC-MAIN-20130516111210-00038-ip-10-60-113-184.ec2.internal.warc.gz",
+    tmp_local_warc_file="downloaded_warc_file.warc.gz",
+):
     file_url = f"https://data.commoncrawl.org/{warc_path}"
-    local_warc_file = "downloaded_warc_file.warc.gz"
 
     try:
         # Step 1: Download the WARC file
-        download_warc_file(file_url, local_warc_file)
+        download_warc_file(file_url, tmp_local_warc_file)
 
         # Step 2: Extract the HTML content for the specific UUID
         print(f"Extracting HTML content for UUID {target_uuid}...")
-        html_content = extract_html_from_warc(local_warc_file, target_uuid)
+        html_content = extract_html_from_warc(tmp_local_warc_file, target_uuid)
 
         if html_content:
             # Step 3: Save or display the extracted HTML

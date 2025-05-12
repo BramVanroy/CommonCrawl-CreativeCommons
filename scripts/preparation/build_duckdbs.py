@@ -56,29 +56,33 @@ def dataset_to_duckdb(
     else:
         os.makedirs(os.path.dirname(duckdb_path), exist_ok=True)
 
+    kwargs = {
+        "path": dataset_name,
+        "name": dataset_config,
+        "num_proc": num_loaders,
+        "cache_dir": cache_dir,
+    }
     print(f"Starting to build DuckDB file at {duckdb_path}")
-    try:
-        ds = load_dataset(
-            dataset_name,
-            dataset_config,
-            num_proc=num_loaders,
-            # Only works when the origin files are parquet.
-            columns=["dump", "id"],
-            cache_dir=cache_dir,
-        )
-    except (TypeError, ValueError):
+
+    while num_retries := 3:
         try:
-            ds = load_dataset(
-                dataset_name,
-                dataset_config,
-                num_proc=num_loaders,
-                cache_dir=cache_dir,
-            )
-        except Exception:
-            print(
-                f"Failed to load dataset {dataset_name} with config {dataset_config}. Maybe the config is too recent?"
-            )
-            return False
+            ds = load_dataset(**kwargs, columns=["dump", "id"])
+        except (TypeError, ValueError):
+            try:
+                ds = load_dataset(**kwargs)
+            except Exception as exc:
+                num_retries -= 1
+                if num_retries == 0:
+                    raise Exception(
+                        f"Failed to load dataset {dataset_name} with config {dataset_config}."
+                        " Maybe the config (crawl) is too recent and does not actually exist in this repo?"
+                    ) from exc
+                else:
+                    sleep(60 / num_retries)
+            else:
+                break
+        else:
+            break
 
     if isinstance(ds, DatasetDict) or isinstance(ds, IterableDatasetDict):
         ds = concatenate_datasets([ds[split] for split in list(ds.keys())])
@@ -207,13 +211,14 @@ def build_fw2_dbs(
             )
             config_success[cfg_name] = lang_success
         else:
-            print(f"Skipping processing {cfg_name} because the DuckDB file already exists either locally or in the remote repo")
+            print(
+                f"Skipping processing {cfg_name} because the DuckDB file already exists either locally or in the remote repo"
+            )
             config_success[cfg_name] = True
 
         if os.path.isfile(local_duckdb_path) and (overwrite or not exists_in_repo):
             print(f"Uploading {local_duckdb_path}")
-            num_retries = 3
-            while num_retries:
+            while num_retries := 3:
                 try:
                     upload_file(
                         path_or_fileobj=local_duckdb_path,
@@ -221,7 +226,7 @@ def build_fw2_dbs(
                         repo_id="BramVanroy/fineweb-2-duckdbs",
                         repo_type="dataset",
                     )
-                except HfHubHTTPError as exc:
+                except Exception as exc:
                     num_retries -= 1
                     if num_retries == 0:
                         raise exc
