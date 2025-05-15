@@ -5,10 +5,7 @@ import pyarrow as pa
 from datasets import load_dataset
 from datatrove.pipeline.base import PipelineStep
 from datatrove.pipeline.extractors import Trafilatura
-from datatrove.pipeline.filters import (
-    LanguageFilter,
-    URLFilter,
-)
+from datatrove.pipeline.filters import URLFilter
 from datatrove.pipeline.formatters import FTFYFormatter, PIIFormatter, SymbolLinesFormatter
 from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
@@ -16,11 +13,11 @@ from huggingface_hub import hf_hub_download
 from pydantic import BaseModel
 
 from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
-from .components.filters import EmptyTextFilter, LicenseFilter
+from .components.filters import EmptyTextFilter, LicenseFilter, LanguageFilterWithIgnore
 
 
 # Afrikaans, German, English, French, Frisian, Italian, Dutch, Spanish
-LANGUAGES = [
+LANGUAGES_V1 = [
     "afr_Latn",
     "deu_Latn",
     "eng_Latn",
@@ -59,7 +56,8 @@ class BaseConfig(BaseModel):
 
     randomize_start_duration: int = 0
     language_threshold: float = 0.65
-    languages: list = LANGUAGES
+    languages: list | None = None
+    ignore_undetermined: bool = True
     fw_duckdb_templ_path: str | None = None
     fw2_duckdb_templ_path: str | None = None
     overwrite_with_none: bool = False
@@ -77,16 +75,17 @@ class SlurmConfig(BaseConfig):
     main_cpus_per_task: int = 1
     containment_cpus_per_task: int = 16
     max_array_launch_parallel: bool = False
-    stagger_max_array_jobs: int = 600
+    stagger_max_array_jobs: int = 900
 
 
 def build_main_pipeline(
     dump: str,
     output_path: str,
-    languages: list[str],
+    languages: list[str] | None,
     language_threshold: float = 0.65,
     limit: int = -1,
     extra_domains: list[str] | None = None,
+    ignore_undetermined: bool = True,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -95,7 +94,7 @@ def build_main_pipeline(
         dump (str): Common Crawl dump to process
         output_path (str): Path to the output directory. Files will be written as
         ${language}_${language_script}/${rank}.jsonl.gz
-        languages (list[str]): List of languages to filter for
+        languages (list[str]): List of languages to filter for or None
         language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
         -1 = no limit. Defaults to -1.
@@ -104,6 +103,8 @@ def build_main_pipeline(
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
+    # Do not include any of GlotLID's undetermined languages: https://github.com/cisnlp/GlotLID/blob/main/languages-v3.md
+    ignore_languages = ["und"] if ignore_undetermined else []
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -111,22 +112,24 @@ def build_main_pipeline(
             default_metadata={"dump": dump},
             limit=limit,
         ),
-        URLFilter(
-            extra_domains=extra_domains,
-        ),
-        EmptyTextFilter(),  # filter items with empty HTML (text-attr = read HTML at this point)
+        URLFilter(extra_domains=extra_domains),
+        EmptyTextFilter(),  # filter items with empty HTML (text-attr = read HTML at this point) -- cheap
         LicenseAnnotator(),
         LicenseFilter(),
-        Trafilatura(favour_precision=True, timeout=600.0),
+        # Setting deduplicate to False because of its destructive nature -- https://github.com/adbar/trafilatura/issues/778
+        Trafilatura(favour_precision=True, timeout=60.0, deduplicate=False),
         EmptyTextFilter(),  # filter items with empty extracted text -- should be rare but it's cheap
-        LanguageFilter(backend="glotlid", languages=languages, language_threshold=language_threshold),
-        # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py
+        LanguageFilterWithIgnore(
+            backend="glotlid",
+            languages=languages,
+            ignore_languages=ignore_languages,
+            language_threshold=language_threshold
+        ),
+        # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py:
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
         PIIFormatter(),  # remove PII
         SymbolLinesFormatter(symbols_to_remove=["|"], replace_char="\n"),  # fix trafilatura table artifacts
-        JsonlWriter(
-            output_folder=f"{output_path}/",
-        ),
+        JsonlWriter(output_folder=f"{output_path}/"),
     ]
 
 
