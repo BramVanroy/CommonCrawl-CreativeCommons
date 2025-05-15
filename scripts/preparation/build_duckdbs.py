@@ -16,7 +16,7 @@ from huggingface_hub import list_repo_files, upload_file
 from huggingface_hub.errors import HfHubHTTPError
 from huggingface_hub.hf_api import create_repo, repo_exists
 
-from commoncrawl_cc_annotation.utils import extract_uuid
+from c5.utils import extract_uuid
 
 
 def dataset_to_duckdb(

@@ -3,14 +3,14 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import (
+from c5.script_utils import (
     BaseConfig,
     build_containment_pipeline,
     build_main_pipeline,
     download_duckdbs,
     get_fw_c_and_d_domains,
 )
-from commoncrawl_cc_annotation.utils import PROJECT_ROOT
+from c5.utils import PROJECT_ROOT
 
 
 def main(

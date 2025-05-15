@@ -6,7 +6,7 @@ from pathlib import Path
 from datatrove.pipeline.readers import WarcReader
 from tqdm import tqdm
 
-from commoncrawl_cc_annotation.components.annotators.license_annotator import (
+from c5.components.annotators.license_annotator import (
     _legacy_find_cc_licenses_in_html,
     find_cc_licenses_in_html,
 )

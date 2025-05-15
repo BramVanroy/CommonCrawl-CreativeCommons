@@ -11,9 +11,9 @@ from datasets.arrow_dataset import Dataset
 from huggingface_hub.file_download import hf_hub_download
 from huggingface_hub.hf_api import list_repo_files, upload_file
 
-from commoncrawl_cc_annotation.data_utils import yield_repo_parquet_files
-from commoncrawl_cc_annotation.script_utils import SCHEMA
-from commoncrawl_cc_annotation.utils import extract_uuid
+from c5.data_utils import yield_repo_parquet_files
+from c5.script_utils import SCHEMA
+from c5.utils import extract_uuid
 
 
 def check_eng_fw(ids, con):

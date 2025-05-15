@@ -3,7 +3,7 @@ requires = ["setuptools >= 64", "setuptools_scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "commoncrawl_cc_annotation"
+name = "c5"
 dynamic = ["version"]
 authors = [
     {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
@@ -11,9 +11,9 @@ authors = [
 maintainers = [
     {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
 ]
-description = "Automated data quality annotation"
+description = "Software to build the Common Crawl Creative Commons Corpus (C5)"
 readme = "README.md"
-keywords = ["data creation", "copyrighted data", "data annotation", "common crawl"]
+keywords = ["data creation", "creative commons", "data annotation", "common crawl"]
 license = {file = "LICENSE"}
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -30,18 +30,18 @@ classifiers = [
 
 requires-python = ">=3.10"
 dependencies = [
-    "beautifulsoup4>=4.7.0",
-    "datasets",
-    "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/huggingface/datatrove@b9fb72a21350fd9ed13a115a6d24ea5f58015ae7",
-    "duckdb",
+    "beautifulsoup4>=4.7.0,<5",
+    "datasets>3,<4",
+    "datatrove[io,s3,processing,multilingual,cli]@git+https://github.com/huggingface/datatrove@v0.5.0",
+    "duckdb>1,<2",
     "huggingface_hub[hf_transfer,hf_xet]",
-    "html5lib",
+    "html5lib>1,<2",
     "kenlm==0.2.0",
-    "lxml",
+    "lxml>5,<6",
     "lxml_html_clean",
     "pip",
-    "pydantic",
-    "tldextract",
+    "pydantic>2,<3",
+    "tldextract>5.0,<6.0",
     "typing_extensions",
 ]
 
@@ -69,7 +69,7 @@ license-files = ["LICEN[CS]E*"]
 where = ["src"]
 
 [tool.setuptools_scm]
-version_file = "src/commoncrawl_cc_annotation/version.py"
+version_file = "src/c5/version.py"
 
 [tool.ruff]
 line-length = 119
@@ -84,7 +84,7 @@ select = ["C", "E", "F", "W", "I"]
 
 [tool.ruff.lint.isort]
 lines-after-imports = 2
-known-first-party = ["commoncrawl_cc_annotation"]
+known-first-party = ["c5"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

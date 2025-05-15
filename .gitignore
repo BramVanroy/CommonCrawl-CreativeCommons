@@ -14,7 +14,7 @@ configs/*
 downloaded_warc_file.warc.gz
 extracted.html
 
-src/commoncrawl_cc_annotation/version.py
+src/c5/version.py
 
 uv.lock
 .ruff_cache

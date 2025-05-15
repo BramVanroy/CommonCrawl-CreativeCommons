@@ -11,7 +11,7 @@ from transformers import AutoTokenizer
 from transformers import logging as transformers_logging
 
 
-# Suppress the specific warning
+# Suppress tokenizer warnings
 warnings.filterwarnings("ignore", message=r".*Token indices sequence length is longer.*")
 transformers_logging.set_verbosity_error()
 
@@ -25,8 +25,7 @@ def count(texts: list[str]) -> dict[str, list[int]]:
     return {"num_tokens": [len(ids) for ids in tokenizer(texts)["input_ids"]]}
 
 
-def get_stats(num_proc: int | None = None, force_overwrite: bool = False) -> None:
-    dataset_name = "BramVanroy/CommonCrawl-CreativeCommons"
+def get_stats(dataset_name: str, num_proc: int | None = None, force_overwrite: bool = False) -> None:
     files = list_repo_files(dataset_name, repo_type="dataset")
 
     configs = set()
@@ -68,7 +67,7 @@ def get_stats(num_proc: int | None = None, force_overwrite: bool = False) -> Non
             continue
 
         ds = load_dataset(
-            "BramVanroy/CommonCrawl-CreativeCommons",
+            dataset_name,
             cfg,
             split="train",
             cache_dir=CACHE_DIR / cfg,
@@ -120,6 +119,13 @@ if __name__ == "__main__":
 
     cparser = argparse.ArgumentParser(
         description="Count the number of docs and tokens in the Creative Commons dataset."
+    )
+    cparser.add_argument(
+        "-d",
+        "--dataset_name",
+        type=str,
+        default="BramVanroy/CommonCrawl-CreativeCommons",
+        help="Name of the dataset to process.",
     )
     cparser.add_argument(
         "-j",

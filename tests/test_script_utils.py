@@ -1,5 +1,5 @@
 import pytest
-from commoncrawl_cc_annotation.script_utils import get_dumps_with_duckdb
+from c5.script_utils import get_dumps_with_duckdb
 
 @pytest.mark.parametrize(
     "dump_name, ignore_duckdb_for, languages, expected_ignore_duckdb_for, expected_ignore_all_duckdb",

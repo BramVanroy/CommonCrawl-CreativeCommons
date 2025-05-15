@@ -3,8 +3,8 @@ from pathlib import Path
 import yaml
 from datatrove.executor.local import LocalPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import BaseUploadConfig, build_upload_pipeline
-from commoncrawl_cc_annotation.utils import PROJECT_ROOT
+from c5.script_utils import BaseUploadConfig, build_upload_pipeline
+from c5.utils import PROJECT_ROOT
 
 
 def main(

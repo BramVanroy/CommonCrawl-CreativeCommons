@@ -6,8 +6,8 @@ import pyarrow.parquet as pq
 from datasets import Dataset, Features
 from huggingface_hub import create_repo, list_repo_files, upload_file
 
-from commoncrawl_cc_annotation.data_utils import yield_repo_parquet_files
-from commoncrawl_cc_annotation.script_utils import SCHEMA_NULLABLE
+from c5.data_utils import yield_repo_parquet_files
+from c5.script_utils import SCHEMA_NULLABLE
 
 
 def main(

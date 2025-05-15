@@ -1,7 +1,7 @@
 quality:
-	ruff check src/commoncrawl_cc_annotation scripts/
-	ruff format --check src/commoncrawl_cc_annotation scripts/
+	ruff check src/c5 scripts/
+	ruff format --check src/c5 scripts/
 
 style:
-	ruff check src/commoncrawl_cc_annotation scripts/ --fix
-	ruff format src/commoncrawl_cc_annotation scripts/
+	ruff check src/c5 scripts/ --fix
+	ruff format src/c5 scripts/

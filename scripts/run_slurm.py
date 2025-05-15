@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import (
+from c5.script_utils import (
     SlurmConfig,
     build_containment_pipeline,
     build_main_pipeline,
@@ -11,7 +11,7 @@ from commoncrawl_cc_annotation.script_utils import (
     get_fw_c_and_d_domains,
     job_id_retriever,
 )
-from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
+from c5.utils import PROJECT_ROOT, print_system_stats
 
 
 def main(

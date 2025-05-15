@@ -1,5 +1,5 @@
 import pytest
-from commoncrawl_cc_annotation.components.annotators.license_annotator import License, parse_cc_license_url, find_cc_licenses_in_html, sort_licenses
+from c5.components.annotators.license_annotator import License, parse_cc_license_url, find_cc_licenses_in_html, sort_licenses
 
 
 @pytest.mark.parametrize(

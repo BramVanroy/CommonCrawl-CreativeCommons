@@ -8,8 +8,8 @@ from datasets import Features, load_dataset
 from datasets.arrow_dataset import Dataset
 from huggingface_hub.hf_api import upload_file
 
-from commoncrawl_cc_annotation.data_utils import yield_repo_parquet_files
-from commoncrawl_cc_annotation.script_utils import SCHEMA_NULLABLE
+from c5.data_utils import yield_repo_parquet_files
+from c5.script_utils import SCHEMA_NULLABLE
 
 
 no_cache_extract = tldextract.TLDExtract(cache_dir=None)
@@ -108,7 +108,8 @@ if __name__ == "__main__":
 
     cparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Remove rows with domains that are known to be C&D'd from the CommonCrawl-CreativeCommons dataset",
+        description="Remove rows with domains that are known to be C&D'd from the CommonCrawl-CreativeCommons dataset."
+        " This is part of the local and slurm pipelines but you can use this script if you want to run it manually.",
     )
     cparser.add_argument(
         "--skip-dumps",
@@ -132,17 +133,3 @@ if __name__ == "__main__":
 
     cli_kwargs = vars(cparser.parse_args())
     main(**cli_kwargs)
-
-"""
-Done:
-CC-MAIN-2019-30
-CC-MAIN-2020-05
-CC-MAIN-2023-06
-CC-MAIN-2024-51
-CC-MAIN-2024-46
-CC-MAIN-2025-05
-
-TODO:
-CC-MAIN-2021-04
-CC-MAIN-2022-05
-"""

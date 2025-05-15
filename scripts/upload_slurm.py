@@ -3,8 +3,8 @@ from pathlib import Path
 import yaml
 from datatrove.executor.slurm import SlurmPipelineExecutor
 
-from commoncrawl_cc_annotation.script_utils import SlurmUploadConfig, build_upload_pipeline, job_id_retriever
-from commoncrawl_cc_annotation.utils import PROJECT_ROOT, print_system_stats
+from c5.script_utils import SlurmUploadConfig, build_upload_pipeline, job_id_retriever
+from c5.utils import PROJECT_ROOT, print_system_stats
 
 
 def main(
