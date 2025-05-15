@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Literal
 
 import pyarrow as pa
 from datasets import load_dataset
@@ -9,14 +10,13 @@ from datatrove.pipeline.filters import URLFilter
 from datatrove.pipeline.formatters import FTFYFormatter, PIIFormatter, SymbolLinesFormatter
 from datatrove.pipeline.readers import JsonlReader, WarcReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel
 
 from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter, LanguageFilterWithIgnore
 
 
-# Afrikaans, German, English, French, Frisian, Italian, Dutch, Spanish
 LANGUAGES_V1 = [
     "afr_Latn",
     "deu_Latn",
@@ -26,6 +26,32 @@ LANGUAGES_V1 = [
     "ita_Latn",
     "nld_Latn",
     "spa_Latn",
+]
+LANGUAGES_EU = [
+    "bul_Cyrl",
+    "hrv_Latn",
+    "ces_Latn",
+    "dan_Latn",
+    "nld_Latn",
+    "eng_Latn",
+    "est_Latn",
+    "fin_Latn",
+    "fra_Latn",
+    "deu_Latn",
+    "ell_Grek",
+    "hun_Latn",
+    "gle_Latn",
+    "ita_Latn",
+    "lav_Latn",
+    "lit_Latn",
+    "mlt_Latn",
+    "pol_Latn",
+    "por_Latn",
+    "ron_Latn",
+    "slk_Latn",
+    "slv_Latn",
+    "spa_Latn",
+    "swe_Latn"
 ]
 
 
@@ -56,13 +82,21 @@ class BaseConfig(BaseModel):
 
     randomize_start_duration: int = 0
     language_threshold: float = 0.65
-    languages: list | None = None
+    languages: list | None | Literal["v1", "eu"] = None
     ignore_undetermined: bool = True
     fw_duckdb_templ_path: str | None = None
     fw2_duckdb_templ_path: str | None = None
     overwrite_with_none: bool = False
     ignore_duckdb_for: list[str] | None = None
     limit: int = -1
+
+    def model_post_init(self, __context):
+        if not self.languages:
+            self.languages = retrieve_supported_languages()
+        elif self.languages == "v1":
+            self.languages = LANGUAGES_V1
+        elif self.languages == "eu":
+            self.languages = LANGUAGES_EU
 
 
 class SlurmConfig(BaseConfig):
@@ -103,8 +137,8 @@ def build_main_pipeline(
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
-    # Do not include any of GlotLID's undetermined languages: https://github.com/cisnlp/GlotLID/blob/main/languages-v3.md
-    ignore_languages = ["und"] if ignore_undetermined else []
+    # Do not include any of GlotLID's nonlinguistic and undetermined languages: https://github.com/cisnlp/GlotLID/blob/main/languages-v3.md
+    ignore_languages = ["und", "zxx"] if ignore_undetermined else []
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -369,6 +403,7 @@ def get_dumps_with_duckdb(
             - List of languages to ignore when querying the DuckDB databases, e.g. ["eng_Latn", "fra_Latn"].
             - Boolean indicating whether all languages should be ignored.
     """
+    languages = languages or []
     dump_year = int(dump_name.split("-")[2])
     dump_issue = int(dump_name.split("-")[3])
 
@@ -386,6 +421,23 @@ def get_dumps_with_duckdb(
 
     return ignore_duckdb_for, ignore_all_duckdb
 
+def retrieve_supported_languages(include_english: bool = True) -> list[str]:
+    """
+    Retrieve the list of supported languages from the FineWeb-2 DuckDB databases.
+    This function downloads the list of files from the Hugging Face repository and extracts
+    the language codes from the filenames. The function also adds "eng_Latn" to the list of languages.
+
+    Args:
+        include_english (bool): Whether to include "eng_Latn" in the list of languages. Defaults to True.
+
+    Returns:
+        list[str]: List of supported languages, e.g. ["eng_Latn", "fra_Latn", "aak_Latn", ...].
+    """
+    fnames = list_repo_files(repo_id="BramVanroy/fineweb-2-duckdbs", repo_type="dataset",)
+    languages = [f.replace("fw2-", "").replace(".duckdb", "") for f in fnames if f.endswith(".duckdb") and "_removed" not in f]
+    if include_english:
+        languages += ["eng_Latn"]
+    return languages
 
 def download_duckdbs(dump_name: str, fw_duckdb_path: str, cfg: BaseConfig) -> tuple[list[str], bool]:
     """
@@ -393,6 +445,11 @@ def download_duckdbs(dump_name: str, fw_duckdb_path: str, cfg: BaseConfig) -> tu
     which languages should be ignored when querying the databases and whether ALL should be ignored.
     This is useful because it would allow us to set the 'found' field to None for all documents.
     See FWDatabaseContainmentAnnotator for more details.
+
+    WARNING: if you're running the pipeline on all languages, this will have to download
+    all fineweb-2 duckdbs immediately. This will amount to around ~300GB of data! If you
+    do not want that, either be specific in your config about the languages you want to process,
+    or do not run the containment pipeline.
 
     Args:
         dump_name (str): Name of the dump (e.g., "CC-MAIN-2024-18")

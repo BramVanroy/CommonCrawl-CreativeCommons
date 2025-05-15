@@ -3,6 +3,7 @@ main_workers: 16
 fw2_duckdb_templ_path: duckdbs/fineweb-2/fw2-{language}.duckdb
 fw_duckdb_templ_path: duckdbs/fineweb/fw-{dump}.duckdb
 limit: 1000
+languages: "eu"
 
 containment_tasks: 16
 containment_workers: 16
