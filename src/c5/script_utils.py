@@ -13,6 +13,8 @@ from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel
 
+from c5.data_utils import download_fw2_language_configs, get_fw2_language_threshold
+
 from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
 from .components.filters import EmptyTextFilter, LicenseFilter, LanguageFilterWithIgnore
 
@@ -116,7 +118,6 @@ def build_main_pipeline(
     dump: str,
     output_path: str,
     languages: list[str] | None,
-    language_threshold: float = 0.65,
     limit: int = -1,
     extra_domains: list[str] | None = None,
     ignore_undetermined: bool = True,
@@ -129,7 +130,6 @@ def build_main_pipeline(
         output_path (str): Path to the output directory. Files will be written as
         ${language}_${language_script}/${rank}.jsonl.gz
         languages (list[str]): List of languages to filter for or None
-        language_threshold (float, optional): Minimum language detection threshold. Defaults to 0.65.
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
         -1 = no limit. Defaults to -1.
         extra_domains (list[str], optional): List of extra domains to filter for. Defaults to None.
@@ -139,6 +139,18 @@ def build_main_pipeline(
     """
     # Do not include any of GlotLID's nonlinguistic and undetermined languages: https://github.com/cisnlp/GlotLID/blob/main/languages-v3.md
     ignore_languages = ["und", "zxx"] if ignore_undetermined else []
+    fw2_languages = [l for l in languages if l != "eng_Latn"]
+    lang_thresholds = get_fw2_language_threshold(fw2_languages)
+
+    if languages is not None:
+        for lang in languages:
+            if lang not in lang_thresholds:
+                raise ValueError(f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data.")
+    
+    if "eng_Latn" in languages:
+        # Add the English language threshold to the thresholds
+        lang_thresholds["eng_Latn"] = 0.65
+    
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -156,8 +168,8 @@ def build_main_pipeline(
         LanguageFilterWithIgnore(
             backend="glotlid",
             languages=languages,
-            ignore_languages=ignore_languages,
-            language_threshold=language_threshold
+            ignore_language_prefixes=ignore_languages,
+            language_threshold=lang_thresholds
         ),
         # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py:
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting

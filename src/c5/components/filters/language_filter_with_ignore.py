@@ -1,6 +1,6 @@
+from functools import cached_property
 from datatrove.pipeline.filters.language_filter import LanguageFilter
-from typing import Literal
-
+from collections import defaultdict
 from datatrove.data import Document
 from datatrove.pipeline.writers.disk_base import DiskWriter
 
@@ -9,26 +9,26 @@ class LanguageFilterWithIgnore(LanguageFilter):
     def __init__(       
         self,     
         languages: list[str] | str | None = None,
-        ignore_languages: list[str] | str | None = None,
-        language_threshold: float = 0.65,
+        ignore_language_prefixes: list[str] | str | None = None,
+        language_threshold: float | dict = 0.65,
         exclusion_writer: DiskWriter = None,
-        backend: Literal["ft176", "glotlid"] = "ft176",
         label_only: bool = False,
-        keep_top_pairs_threshold: float = -1,
     ):
         """
         See  datatrove.pipeline.filters.language_filter.LanguageFilter
         filters if the predicted language is not among given language or if the language score is below language
         language_threshold
 
-        ADDED: `ignore_languages`. It has precedence over `label_only` and `languages`. If a language is in this list,
-        the document is removed regardless of the language score. 
+        ADDED: `ignore_language_prefixes`. If a language is in this list,
+        the document is removed regardless of the language score. Here the language does NOT include the script, e.g.
+        `eng` instead of `eng_Latn`. This allows to ignore `und`, for undertermined languages.
 
         Args:
             languages: list of languages to keep. None for all
-            ignore_languages: list of languages to ignore. If the language is in this list, the document is removed
+            ignore_language_prefixes: list of languages to ignore. If the language is in this list, the document is removed
                 regardless of the language score. 
-            language_threshold: language_threshold minimum score to accept a document
+            language_threshold: language_threshold minimum score to accept a document. Can be a float or a dict with
+                language as key and threshold as value.
             exclusion_writer:
             label_only: if True, only the language label is added to the metadata and no documents are removed
             keep_top_pairs_threshold: keep a list of all language pairs with at least this score. -1 to disable
@@ -37,43 +37,88 @@ class LanguageFilterWithIgnore(LanguageFilter):
             languages=languages,
             language_threshold=language_threshold,
             exclusion_writer=exclusion_writer,
-            backend=backend,
+            backend="glotlid",
             label_only=label_only,
-            keep_top_pairs_threshold=keep_top_pairs_threshold,
+            keep_top_pairs_threshold=-1,
         )
-        if isinstance(ignore_languages, str):
-            ignore_languages = [ignore_languages]
-        elif ignore_languages is None:
-            ignore_languages = []
-        self.ignore_languages = ignore_languages
+        if isinstance(ignore_language_prefixes, str):
+            ignore_language_prefixes = [ignore_language_prefixes]
+        elif ignore_language_prefixes is None:
+            ignore_language_prefixes = []
+        self.ignore_language_prefix = set(ignore_language_prefixes)
 
-    def filter(self, doc: Document) -> bool:
+        for lang in self.ignore_language_prefix:
+            if lang not in self.supported_prefixes:
+                raise ValueError(f"language prefix {lang} not supported by the model. Supported language prefixes are: {sorted(self.supported_prefixes)}")
+
+        if self.languages is not None:
+            self.languages = set(self.languages)
+            for lang in self.languages:
+                if lang not in self.supported_languages:
+                    raise ValueError(f"language {lang} not supported by the model. Supported languages are: {sorted(self.supported_languages)}")
+
+        # If language_threshold is a float, convert it to a dict with default value
+        # so any language will have the same threshold
+        if isinstance(self.language_threshold, float):
+            self.language_threshold = defaultdict(lambda: self.language_threshold)
+        elif isinstance(self.language_threshold, dict):
+            for lang in self.language_threshold.keys():
+                if lang not in self.supported_languages:
+                    raise ValueError(f"language {lang} not supported by the model. Supported languages are: {sorted(self.supported_languages)}")
+        else:
+            raise ValueError(f"language_threshold must be a float or a dict, not {type(self.language_threshold)}")
+        
+    @cached_property
+    def supported_languages(self) -> set[str]:
+        """Returns the supported languages by the model"""
+        return {lang.split("__")[2] for lang in self.model.model.labels}
+    
+    @cached_property
+    def supported_prefixes(self) -> set[str]:
+        """Returns the supported prefixes by the model"""
+        return {lang.split("_")[0] for lang in self.supported_languages}
+
+    def filter(self, doc: Document) -> bool | tuple[bool, str]:
         """Args:
             doc: document
 
         Returns:
             is_filter
         """
-        best_lang_pair, lang_pairs = self.model.predict(doc)
+        _, lang_pairs = self.model.predict(doc)
+        # Sort by score
+        lang_pairs = dict(sorted(lang_pairs.items(), key=lambda item: item[1], reverse=True))
+        # Highest score first
+        for lang, score in lang_pairs.items():
+            if score > self.language_threshold[lang]:
+                best_lang_pair = (lang, score)
+                break
+        else:
+            if not self.label_only:
+                return False, f"no language above its threshold"
+            else:
+                # If no language matches its threshold, we can still return the best one
+                # which is the first one in the sorted dictionary
+                best_lang_pair = next(iter(lang_pairs.items()))
+        
         lang, lang_score = best_lang_pair
-        if self.backend == "glotlid":
-            lang, script = lang.split("_")
-            doc.metadata["language_script"] = script
+        
+        if not self.label_only and self.languages is not None and lang not in self.languages:
+            return False, f"language {lang} not in {self.languages}"
+        
+        lang, script = lang.split("_")
+
+        if not self.label_only:
+            # Loop so we can provide the language that was ignored in reasoning
+            for ignore_lang in self.ignore_language_prefix:
+                # If using glotlid: at this point `lang` is the language code, not include the script
+                # the script is in `doc.metadata["language_script"]`
+                if lang == ignore_lang:
+                    return False, f"language in ignore list: {ignore_lang}" 
+        
+        doc.metadata["language_script"] = script
         doc.metadata["language"] = lang
         doc.metadata["language_score"] = lang_score
-        if self.keep_top_pairs_threshold != -1:
-            for key, value in lang_pairs.items():
-                if value > self.keep_top_pairs_threshold:
-                    doc.metadata[f"top_language_{key}_score"] = value
-
-        for ignore_lang in self.ignore_languages:
-            # If using glotlid: at this point `lang` is the language code, not include the script
-            # the script is in `doc.metadata["language_script"]`
-            if lang == ignore_lang:
-                return False, f"language in ignore list: {ignore_lang}" 
         
-        return (
-            self.label_only
-            or (self.languages and any(score > self.language_threshold for score in lang_pairs.values()))
-            or (self.languages is None and lang_score > self.language_threshold)
-        )
+        return True
+        

@@ -9,6 +9,7 @@ log.out
 configs/*
 !configs/example-*
 *tmp*/
+language_configs/
 
 .vscode/
 downloaded_warc_file.warc.gz
