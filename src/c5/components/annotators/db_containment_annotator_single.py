@@ -16,7 +16,7 @@ class FWSingleDBContainmentAnnotator(BaseBatchAnnotator):
         duckdb_path: str,
         is_fw2: bool,
         added_key: str,
-        batch_size: int = 128,
+        batch_size: int = 512,
         overwrite_with_none: bool = False,
     ):
         super().__init__(batch_size=batch_size)
