@@ -34,10 +34,9 @@ def main(
     main_dump_output_path = main_output_path + dump + "/"
     main_pipeline = build_main_pipeline(
         dump=dump,
-        output_path=main_dump_output_path,
+        output_folder=main_dump_output_path,
         languages=cfg.languages,
         ignore_undetermined=cfg.ignore_undetermined,
-        language_threshold=cfg.language_threshold,
         limit=cfg.limit,
         extra_domains=get_fw_c_and_d_domains(),
     )

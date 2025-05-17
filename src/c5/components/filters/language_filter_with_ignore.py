@@ -1,13 +1,14 @@
-from functools import cached_property
-from datatrove.pipeline.filters.language_filter import LanguageFilter
 from collections import defaultdict
+from functools import cached_property
+
 from datatrove.data import Document
+from datatrove.pipeline.filters.language_filter import LanguageFilter
 from datatrove.pipeline.writers.disk_base import DiskWriter
 
 
 class LanguageFilterWithIgnore(LanguageFilter):
-    def __init__(       
-        self,     
+    def __init__(
+        self,
         languages: list[str] | str | None = None,
         ignore_language_prefixes: list[str] | str | None = None,
         language_threshold: float | dict = 0.65,
@@ -47,36 +48,15 @@ class LanguageFilterWithIgnore(LanguageFilter):
             ignore_language_prefixes = []
         self.ignore_language_prefix = set(ignore_language_prefixes)
 
-        for lang in self.ignore_language_prefix:
-            if lang not in self.supported_prefixes:
-                raise ValueError(f"language prefix {lang} not supported by the model. Supported language prefixes are: {sorted(self.supported_prefixes)}")
-
         if self.languages is not None:
             self.languages = set(self.languages)
-            for lang in self.languages:
-                if lang not in self.supported_languages:
-                    raise ValueError(f"language {lang} not supported by the model. Supported languages are: {sorted(self.supported_languages)}")
 
         # If language_threshold is a float, convert it to a dict with default value
         # so any language will have the same threshold
         if isinstance(self.language_threshold, float):
             self.language_threshold = defaultdict(lambda: self.language_threshold)
-        elif isinstance(self.language_threshold, dict):
-            for lang in self.language_threshold.keys():
-                if lang not in self.supported_languages:
-                    raise ValueError(f"language {lang} not supported by the model. Supported languages are: {sorted(self.supported_languages)}")
-        else:
-            raise ValueError(f"language_threshold must be a float or a dict, not {type(self.language_threshold)}")
-        
-    @cached_property
-    def supported_languages(self) -> set[str]:
-        """Returns the supported languages by the model"""
-        return {lang.split("__")[2] for lang in self.model.model.labels}
-    
-    @cached_property
-    def supported_prefixes(self) -> set[str]:
-        """Returns the supported prefixes by the model"""
-        return {lang.split("_")[0] for lang in self.supported_languages}
+        elif not isinstance(self.language_threshold, dict):
+            raise ValueError("language_threshold must be a float or a dict")
 
     def filter(self, doc: Document) -> bool | tuple[bool, str]:
         """Args:
@@ -95,17 +75,17 @@ class LanguageFilterWithIgnore(LanguageFilter):
                 break
         else:
             if not self.label_only:
-                return False, f"no language above its threshold"
+                return False, "no language above its threshold"
             else:
                 # If no language matches its threshold, we can still return the best one
                 # which is the first one in the sorted dictionary
                 best_lang_pair = next(iter(lang_pairs.items()))
-        
+
         lang, lang_score = best_lang_pair
-        
+
         if not self.label_only and self.languages is not None and lang not in self.languages:
             return False, f"language {lang} not in {self.languages}"
-        
+
         lang, script = lang.split("_")
 
         if not self.label_only:
@@ -114,11 +94,10 @@ class LanguageFilterWithIgnore(LanguageFilter):
                 # If using glotlid: at this point `lang` is the language code, not include the script
                 # the script is in `doc.metadata["language_script"]`
                 if lang == ignore_lang:
-                    return False, f"language in ignore list: {ignore_lang}" 
-        
+                    return False, f"language in ignore list: {ignore_lang}"
+
         doc.metadata["language_script"] = script
         doc.metadata["language"] = lang
         doc.metadata["language_score"] = lang_score
-        
+
         return True
-        

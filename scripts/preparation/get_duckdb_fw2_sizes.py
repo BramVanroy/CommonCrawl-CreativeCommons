@@ -1,5 +1,7 @@
-import requests
 import json
+
+import requests
+
 
 repo_id = "BramVanroy/fineweb-2-duckdbs"
 api_url = f"https://huggingface.co/api/datasets/{repo_id}?blobs=true"
@@ -14,16 +16,16 @@ print(f"Fetching file list and sizes from API: {api_url}")
 try:
     response = requests.get(api_url, timeout=request_timeout_seconds)
     response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
-    
+
     repo_data = response.json()
-    
+
     if 'siblings' in repo_data and isinstance(repo_data['siblings'], list):
         for file_info in repo_data['siblings']:
             if 'rfilename' in file_info and 'size' in file_info:
                 if file_info['rfilename'].endswith(".duckdb") and "_removed" not in file_info['rfilename']:
                     file_name = file_info['rfilename']
                     file_size = file_info['size'] # This should be in bytes as per the API
-                    
+
                     if isinstance(file_size, (int, float)) and file_size >= 0:
                         duckdb_files_info.append({"name": file_name, "size": file_size})
                         total_size_bytes += file_size
@@ -60,4 +62,4 @@ if duckdb_files_info:
         gb_size = total_size_bytes / (1024**3)
         print(f"Which is approximately: {gb_size:.2f} GB")
 else:
-    print(f"No not-removed duckdb files found or an error occurred preventing processing.")
+    print("No not-removed duckdb files found or an error occurred preventing processing.")

@@ -13,10 +13,9 @@ from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel
 
-from c5.data_utils import download_fw2_language_configs, get_fw2_language_threshold
-
-from .components.annotators import FWDatabaseContainmentAnnotator, LicenseAnnotator
-from .components.filters import EmptyTextFilter, LicenseFilter, LanguageFilterWithIgnore
+from c5.components.annotators import FWDBContainmentAnnotator, FWSingleDBContainmentAnnotator, LicenseAnnotator
+from c5.components.filters import EmptyTextFilter, LanguageFilterWithIgnore, LicenseFilter
+from c5.data_utils import get_fw2_language_threshold
 
 
 LANGUAGES_V1 = [
@@ -36,7 +35,7 @@ LANGUAGES_EU = [
     "dan_Latn",
     "nld_Latn",
     "eng_Latn",
-    "est_Latn",
+    "ekk_Latn",
     "fin_Latn",
     "fra_Latn",
     "deu_Latn",
@@ -44,7 +43,7 @@ LANGUAGES_EU = [
     "hun_Latn",
     "gle_Latn",
     "ita_Latn",
-    "lav_Latn",
+    "lvs_Latn",
     "lit_Latn",
     "mlt_Latn",
     "pol_Latn",
@@ -83,7 +82,6 @@ class BaseConfig(BaseModel):
     containment_workers: int = -1
 
     randomize_start_duration: int = 0
-    language_threshold: float = 0.65
     languages: list | None | Literal["v1", "eu"] = None
     ignore_undetermined: bool = True
     fw_duckdb_templ_path: str | None = None
@@ -116,7 +114,7 @@ class SlurmConfig(BaseConfig):
 
 def build_main_pipeline(
     dump: str,
-    output_path: str,
+    output_folder: str,
     languages: list[str] | None,
     limit: int = -1,
     extra_domains: list[str] | None = None,
@@ -127,7 +125,7 @@ def build_main_pipeline(
 
     Args:
         dump (str): Common Crawl dump to process
-        output_path (str): Path to the output directory. Files will be written as
+        output_folder (str): Path to the output directory. Files will be written as
         ${language}_${language_script}/${rank}.jsonl.gz
         languages (list[str]): List of languages to filter for or None
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
@@ -142,15 +140,15 @@ def build_main_pipeline(
     fw2_languages = [l for l in languages if l != "eng_Latn"]
     lang_thresholds = get_fw2_language_threshold(fw2_languages)
 
-    if languages is not None:
-        for lang in languages:
-            if lang not in lang_thresholds:
-                raise ValueError(f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data.")
-    
     if "eng_Latn" in languages:
         # Add the English language threshold to the thresholds
         lang_thresholds["eng_Latn"] = 0.65
     
+    if languages is not None:
+        for lang in languages:
+            if lang not in lang_thresholds:
+                raise ValueError(f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data.")
+
     return [
         WarcReader(
             f"s3://commoncrawl/crawl-data/{dump}/segments/",
@@ -166,7 +164,6 @@ def build_main_pipeline(
         Trafilatura(favour_precision=True, timeout=60.0, deduplicate=False),
         EmptyTextFilter(),  # filter items with empty extracted text -- should be rare but it's cheap
         LanguageFilterWithIgnore(
-            backend="glotlid",
             languages=languages,
             ignore_language_prefixes=ignore_languages,
             language_threshold=lang_thresholds
@@ -175,50 +172,46 @@ def build_main_pipeline(
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
         PIIFormatter(),  # remove PII
         SymbolLinesFormatter(symbols_to_remove=["|"], replace_char="\n"),  # fix trafilatura table artifacts
-        JsonlWriter(output_folder=f"{output_path}/"),
+        JsonlWriter(
+            output_folder=f"{output_folder}/",
+            output_filename="${language}_${language_script}/${rank}.jsonl.gz",
+        ),
     ]
 
 
 def build_containment_pipeline(
     input_path: str,
-    fw_duckdb_path: str,
-    fw2_duckdb_templ_path: str,
-    ignore_duckdb_for: list[str],
-    output_path: str,
+    duckdb_path: str,
+    is_fw2: bool,
+    output_folder: str,
     overwrite_with_none: bool = False,
 ) -> list[PipelineStep]:
     """
     Build a pipeline for annotating the web pages with the database containment information.
 
     Args:
-        fw_duckdb_path: Path to the FineWeb DuckDB database (English).
-        fw2_duckdb_templ_path (str): Path to the DuckDB databases. Must contain the placeholder '{lang}'.
-        Example: "data/duckdbs/fw2-{lang}.db". `lang` will be replaced with the language code
-        as found in the concatenation of `{metadata["language"]}_{metadata["language_script"]}`.
-        ignore_duckdb_for (list[str]): List of languages to ignore when querying the DuckDB databases. For
-        these languages, the 'found' field will be set to `None`.
-        output_path (str): Path to use for the input reading as well as output writing.
+        input_path (str): Path to the input directory.
+        duckdb_path (str): Path to the FineWeb DuckDB database (English) (filled in template URI).
+        is_fw2 (bool): Whether the database is FineWeb-2 or not.
+        output_path (str): Path to use for the output directory. Files will be written as
+        ${language}_${language_script}/${rank}.jsonl.gz
         overwrite_with_none (bool, optional): If True, the 'found' field will be set to `None` for all documents,
         regardless of the language. Useful if you know that a given dump does not occur in the other database.
         This improves speed as the database is not queried. Defaults to False.
     """
-    if not fw2_duckdb_templ_path or "{language}" not in fw2_duckdb_templ_path:
-        raise ValueError("The fw2_duckdb_templ_path must contain the placeholder '{language}'")
-
     return [
         JsonlReader(
             data_folder=input_path,
             glob_pattern="**/*.jsonl.gz",
         ),
-        FWDatabaseContainmentAnnotator(
-            fw_duckdb_path=fw_duckdb_path,
-            fw2_duckdb_templ_path=fw2_duckdb_templ_path,
-            ignore_duckdb_for=ignore_duckdb_for,
+        FWSingleDBContainmentAnnotator(
+            duckdb_path=duckdb_path,
+            is_fw2=is_fw2,
             added_key="found_in_fw",
             overwrite_with_none=overwrite_with_none,
         ),
         JsonlWriter(
-            output_folder=f"{output_path}/",
+            output_folder=f"{output_folder}/",
             output_filename="${language}_${language_script}/${rank}.jsonl.gz",
             expand_metadata=True,
         ),
@@ -423,7 +416,7 @@ def get_dumps_with_duckdb(
     ignore_duckdb_for = ignore_duckdb_for or []
 
     if dump_year > 2024 or (dump_year == 2024 and dump_issue > 18):
-        ignore_duckdb_for += [lang for lang in languages if lang not in ["eng_Latn", "eng"]]
+        ignore_duckdb_for += [lang for lang in languages if lang not in ["eng_Latn", "eng", "en"]]
 
     # FW1 v1.3 contains data up to 2024-51
     if dump_year > 2024 or (dump_year == 2024 and dump_issue > 51):

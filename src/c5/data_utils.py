@@ -1,10 +1,9 @@
-from pathlib import Path
-from typing import Generator
-import yaml
-import requests
 import time
 from pathlib import Path
+from typing import Generator
 
+import requests
+import yaml
 from huggingface_hub.file_download import hf_hub_download
 from huggingface_hub.hf_api import list_repo_files
 
@@ -94,7 +93,16 @@ def yield_repo_parquet_files(
                 yield remote_parquet_uri, local_fname
                 break
 
-def get_fw2_language_threshold(languages: list[str] | None = None) -> dict[str, float]:
+def get_fw2_language_threshold(languages: list[str]) -> dict[str, float]:
+    """
+    Get the language threshold for the given languages from the FineWeb-2 repository.
+    
+    Args:
+        languages (list[str]): A list of languages to get the thresholds for.
+
+    Returns:
+        dict[str, float]: A dictionary mapping the languages to their thresholds.
+    """
     pcfg_dir = Path(download_fw2_language_configs(languages))
 
     lang2threshold = {}
@@ -105,73 +113,48 @@ def get_fw2_language_threshold(languages: list[str] | None = None) -> dict[str, 
         lang2threshold[lang] = cfg["language_score"]
 
     return lang2threshold
-                   
 
-def download_fw2_language_configs(languages: list[str] | None = None) -> str:
+
+def download_fw2_language_configs(languages: list[str]) -> str:
     """
-    Downloads all .yaml or .yml files from the GitHub repository's configs directory
-    (https://github.com/huggingface/fineweb-2/tree/main/configs) into the specified
-    local output directory 'pdout'. A simple retry mechanism is included.
+    Download the language configs from the FineWeb-2 repository.
 
     Args:
-        languages (list[str] | None): A list of languages to download. If None, all languages are downloaded.
-
-    Returns:
-        str: The path to the directory where the files were downloaded.
-    """
+        languages (list[str]): A list of languages to download the configs for.
     
-    repo_api_url = "https://api.github.com/repos/huggingface/fineweb-2/contents/configs"
-
+    Returns:
+        str: The path to the directory where the configs are downloaded.
+    """
+    raw_url_template = "https://raw.githubusercontent.com/huggingface/fineweb-2/db2f99d2bde4a8ecde5552373876c9a1fad0bba3/configs/{language}.yml"
     pdout = Path(__file__).parents[2] / "language_configs"
     pdout.mkdir(parents=True, exist_ok=True)
 
-    num_retries = 3
-    wait_seconds = 10
-    while num_retries > 0:
-        try:
-            # An API overview of all files in the configs directory
-            response = requests.get(repo_api_url)
-            response.raise_for_status()
-        except Exception as exc:
-            num_retries -= 1
-            if num_retries > 0:
-                print(f"Retrying in {wait_seconds} seconds...")
-                time.sleep(wait_seconds)
-                wait_seconds *= 2
+    for language in languages:
+        if language == "eng_Latn":
+            continue
+        
+        pfout = pdout / f"{language}.yml"
+        if pfout.exists():
+            print(f"[{language}] Already downloaded, skipping...")
+            continue
+
+        download_url = raw_url_template.format(language=language)
+        num_retries = 3
+        wait_seconds = 10
+        while num_retries > 0:
+            try:
+                file_resp = requests.get(download_url, timeout=10)
+                file_resp.raise_for_status()
+            except Exception as exc:
+                num_retries -= 1
+                if num_retries > 0:
+                    print(f"[{language}] Retrying in {wait_seconds} seconds...")
+                    time.sleep(wait_seconds)
+                    wait_seconds *= 2
+                else:
+                    raise exc
             else:
-                raise exc
-        else:
-            files_info = response.json()
-            break
-
-    for item in files_info:
-        if item["type"] == "file" and item["name"].endswith(".yml"):
-            pfout = pdout / item["name"]
-
-            if pfout.exists() and pfout.stat().st_size > 0:
-                print(f"Skipping {pfout} because it already exists and is not empty.")
-                continue
-
-            if languages is not None and pfout.stem not in languages:
-                print(f"Skipping {pfout} because it is not in the specified languages.")
-                continue
-            
-            num_retries = 3
-            wait_seconds = 10
-            while num_retries > 0:
-                try:
-                    file_resp = requests.get(item["download_url"], timeout=10)
-                    file_resp.raise_for_status()  
-                except Exception as exc:
-                    num_retries -= 1
-                    if num_retries > 0:
-                        print(f"Retrying in {wait_seconds} seconds...")
-                        time.sleep(wait_seconds)
-                        wait_seconds *= 2
-                    else:
-                        raise exc
-                else:             
-                    pfout.write_bytes(file_resp.content)
-                    break 
+                pfout.write_bytes(file_resp.content)
+                break
 
     return str(pdout)

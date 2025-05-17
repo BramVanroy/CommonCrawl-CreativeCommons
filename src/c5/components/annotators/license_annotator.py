@@ -8,7 +8,7 @@ from bs4 import Tag
 from datatrove.data import Document
 from typing_extensions import deprecated
 
-from .base import BaseAnnotator
+from c5.components.annotators.base import BaseAnnotator
 
 
 class LicenseAnnotator(BaseAnnotator):

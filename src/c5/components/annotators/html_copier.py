@@ -1,6 +1,6 @@
 from datatrove.data import Document
 
-from .base import BaseAnnotator
+from c5.components.annotators.base import BaseAnnotator
 
 
 class HtmlCopier(BaseAnnotator):

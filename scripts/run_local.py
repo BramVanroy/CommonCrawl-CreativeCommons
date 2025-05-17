@@ -1,3 +1,4 @@
+from operator import is_
 from pathlib import Path
 
 import yaml
@@ -26,16 +27,15 @@ def main(
     cfg = BaseConfig(**config)
 
     fw_duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
-    ignore_duckdb_for, ignore_all_duckdb = download_duckdbs(dump, fw_duckdb_path, cfg)
+    ignore_duckdb_for, _ = download_duckdbs(dump, fw_duckdb_path, cfg)
 
     main_output_path = output_path.rstrip("/") + "-main/"
     main_dump_output_path = main_output_path + dump + "/"
     main_pipeline = build_main_pipeline(
         dump=dump,
-        output_path=main_dump_output_path,
+        output_folder=main_dump_output_path,
         languages=cfg.languages,
         ignore_undetermined=cfg.ignore_undetermined,
-        language_threshold=cfg.language_threshold,
         limit=cfg.limit,
         extra_domains=get_fw_c_and_d_domains(),
     )
@@ -48,24 +48,32 @@ def main(
     )
 
     # Do containment checking (separately because it's intensive on storage)
-    dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
-    containment_pipeline = build_containment_pipeline(
-        fw_duckdb_path=fw_duckdb_path,
-        fw2_duckdb_templ_path=cfg.fw2_duckdb_templ_path,
-        ignore_duckdb_for=ignore_duckdb_for,
-        input_path=main_dump_output_path,
-        output_path=dump_output_path,
-        overwrite_with_none=ignore_all_duckdb or cfg.overwrite_with_none,
-    )
-    containment_executor = LocalPipelineExecutor(
-        pipeline=containment_pipeline,
-        tasks=cfg.containment_tasks,
-        workers=cfg.containment_workers,
-        logging_dir=str(PROJECT_ROOT / "logs" / "containment-logs" / dump),
-        depends=main_executor,
-    )
+    containment_dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
+    for language in cfg.languages:
+        is_fw2 = language != "eng_Latn"
+        ignore_duckdb = language in ignore_duckdb_for
 
-    containment_executor.run()
+        if is_fw2:
+            duckdb_path = cfg.fw2_duckdb_templ_path.format(dump=dump, language=language)
+        else:
+            duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
+
+        containment_pipeline = build_containment_pipeline(            
+            input_path=main_dump_output_path + language + "/",
+            duckdb_path=duckdb_path,
+            is_fw2=is_fw2,
+            overwrite_with_none=ignore_duckdb,
+            output_folder=containment_dump_output_path,
+        )
+        containment_executor = LocalPipelineExecutor(
+            pipeline=containment_pipeline,
+            tasks=cfg.containment_tasks,
+            workers=cfg.containment_workers,
+            logging_dir=str(PROJECT_ROOT / "logs" / "containment-logs" / dump / language),
+            depends=main_executor,
+        )
+
+        containment_executor.run()
 
 
 if __name__ == "__main__":

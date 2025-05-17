@@ -7,7 +7,7 @@ from ...utils import extract_uuid
 from .base import BaseBatchAnnotator
 
 
-class FWDatabaseContainmentAnnotator(BaseBatchAnnotator):
+class FWDBContainmentAnnotator(BaseBatchAnnotator):
     name = "🗄️ FW Database Containment Annotator"
 
     _requires_dependencies = ["duckdb"]
