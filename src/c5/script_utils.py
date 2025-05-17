@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from c5.components.annotators import FWDBContainmentAnnotator, FWSingleDBContainmentAnnotator, LicenseAnnotator
 from c5.components.filters import EmptyTextFilter, LanguageFilterWithIgnore, LicenseFilter
+from c5.components.readers.robust_jsonl import RobustJsonlReader
 from c5.data_utils import get_fw2_language_threshold
 
 
@@ -200,7 +201,7 @@ def build_containment_pipeline(
         This improves speed as the database is not queried. Defaults to False.
     """
     return [
-        JsonlReader(
+        RobustJsonlReader(
             data_folder=input_path,
             glob_pattern="**/*.jsonl.gz",
         ),
