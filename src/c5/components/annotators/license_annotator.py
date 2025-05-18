@@ -2,12 +2,10 @@ import json
 import re
 import warnings
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import unquote
 
-from bs4 import Tag
 from datatrove.data import Document
-from typing_extensions import deprecated
 
 from c5.components.annotators.base import BaseAnnotator
 
@@ -101,6 +99,8 @@ footer_preference_order = [True, False]
 # Compiled regexes
 CC_URL_REGEX = re.compile(r"creativecommons\.org/(?:licenses|publicdomain)/([^/]+)/(\d\.\d)")
 LICENSE_CODE_CLEANUP_REGEX = re.compile(r"^[^a-z]+|[^a-z]+$")
+WS_BETWEEN_TAGS_REGEX = re.compile(r">\s+<")
+MULTIPLE_WS_REGEX = re.compile(r"\s{2,}")
 
 
 @dataclass
@@ -110,7 +110,7 @@ class License:
     location: location_type
     in_head: bool
     in_footer: bool
-    tag: Tag | str
+    tag: Any | str  # Can be a Tag but import is delayed
     left_context: str | None = None
     right_context: str | None = None
 
@@ -127,7 +127,7 @@ def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None
     Returns:
         tuple[str, str]: the license abbreviation and version, e.g. ('by-nc-nd', '4.0')
     """
-    url = unquote(license_url)
+    url = unquote(license_url).lower()
 
     if "creativecommons.org" not in url:
         return None, None
@@ -174,8 +174,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
         whether it was found in the head, and whether it was found in the footer
     """
     # Lowercase the HTML to make it easier to parse and avoid case-sensitive issues
-    html = html.lower()
-    if "creativecommons.org" not in html:
+    if "creativecommons.org" not in html.lower():
         # No license found or no HTML to parse
         return []
 
@@ -220,12 +219,12 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                 )
 
     # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
-    meta_css_selector = 'meta[name="license"][content*="creativecommons.org"], meta[property="og:license"][content*="creativecommons.org"]'
+    meta_css_selector = 'meta[name="license" i][content*="creativecommons.org" i], meta[property="og:license" i][content*="creativecommons.org" i]'
     for meta_tag in soup.select(meta_css_selector):
         parse_content_license(meta_tag["content"], "meta_tag", meta_tag)
 
     # Check <link href="..."> or <a href="..."> for its "href" attribute
-    link_css_selector = 'link[href*="creativecommons.org"], a[href*="creativecommons.org"]'
+    link_css_selector = 'link[href*="creativecommons.org" i], a[href*="creativecommons.org" i]'
     for tag in soup.select(link_css_selector):
         parse_content_license(tag["href"], f"{tag.name}_tag", tag)
 
@@ -240,7 +239,8 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
     #         "url": "https://creativecommons.org/licenses/by-nc-nd/4.0/"
     #     }
     # }
-    script_css_selector = 'script[type="application/ld+json"]'
+    # </script>
+    script_css_selector = 'script[type="application/ld+json" i]'
     for script_tag in soup.select(script_css_selector):
         if not script_tag.string:
             continue
@@ -260,6 +260,8 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
 
             for item in data_list:
                 if isinstance(item, dict):
+                    # lower-case the keys to avoid case sensitivity issues
+                    item = {k.lower(): v for k, v in item.items()}
                     license_val_candidate = item.get("license", None)
                     if not license_val_candidate:
                         continue
@@ -273,6 +275,8 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                     for license_val in license_vals:
                         # license_val might be a string or dict (if typed)
                         if isinstance(license_val, dict):
+                            # lower-case the keys to avoid case sensitivity issues
+                            license_val = {k.lower(): v for k, v in license_val.items()}
                             # Some schema.org usage might embed the URL in "@id" or "url"
                             if license_url := license_val.get("@id", license_val.get("url", None)):
                                 parse_content_license(license_url, "json-ld", script_tag)
@@ -284,6 +288,28 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
 
 
 TEMP_MARKER_ATTR = "data-c5-ctx-marker"
+# In the case over overlapping tags (one license in the context for another),
+# we need to remove the markers from the context
+RM_MARKER_REGEX = re.compile(rf' {TEMP_MARKER_ATTR}="\d+"')
+
+
+def compress_html(soup) -> str:
+    from bs4 import Comment, NavigableString
+
+    # Strip extra whitespace from all text nodes, safely
+    for element in soup.descendants:
+        # Remove html comments
+        if isinstance(element, Comment):
+            element.extract()
+        elif isinstance(element, NavigableString):
+            cleaned = MULTIPLE_WS_REGEX.sub(" ", element)
+            if element.parent.name in ["script", "style"]:
+                # Strip inner content of script and style tags
+                cleaned = cleaned.strip()
+            element.replace_with(cleaned)
+
+    # removes whitespace between tags only
+    return WS_BETWEEN_TAGS_REGEX.sub("><", str(soup))
 
 
 def add_license_contexts(soup, licenses: list[License], context_length: int = 120):
@@ -301,32 +327,44 @@ def add_license_contexts(soup, licenses: list[License], context_length: int = 12
         Returns error messages for elements that couldn't be processed.
     """
     if not licenses:
-        return
+        return []
+
+    from bs4 import Tag
 
     # Add a unique attribute to quickly find the elements in the HTML string, even if the
     # tags are exact duplicates themselves
+    # This loop modifies the tags within the 'soup' object directly
     for idx, lcns in enumerate(licenses):
-        lcns.tag[TEMP_MARKER_ATTR] = str(idx)
+        if isinstance(lcns.tag, Tag):
+            lcns.tag[TEMP_MARKER_ATTR] = str(idx)
 
-    full_html_cleaned = " ".join(str(soup).split())
+    # Remove whitespace/newlines between elements, so that the context is not
+    # full of whitespace. Also removes newlines in text! So slightly
+    # destructive but that should not be too important when content-checking
+    # the contexts for a user.
+    full_html_cleaned = compress_html(soup)
     html_len = len(full_html_cleaned)
 
+    processed_licenses = []
     for lcns in licenses:
-        search_str = str(lcns.tag)
-        start_index = full_html_cleaned.index(search_str)
-        end_index = start_index + len(search_str)
+        search_str_marked = compress_html(lcns.tag)
+        start_index = full_html_cleaned.index(search_str_marked)
+        end_index = start_index + len(search_str_marked)
 
         context_before_start = max(0, start_index - context_length)
-        context_before = full_html_cleaned[context_before_start:start_index]
+        context_before = RM_MARKER_REGEX.sub("", full_html_cleaned[context_before_start:start_index])
+
         lcns.left_context = context_before
 
         context_after_end = min(html_len, end_index + context_length)
-        context_after = full_html_cleaned[end_index:context_after_end]
+        context_after = RM_MARKER_REGEX.sub("", full_html_cleaned[end_index:context_after_end])
         lcns.right_context = context_after
         del lcns.tag[TEMP_MARKER_ATTR]
-        lcns.tag = str(lcns.tag)  # For easier serialization
+        lcns.tag = compress_html(lcns.tag)  # For easier serialization
 
-    return licenses
+        processed_licenses.append(lcns)
+
+    return processed_licenses
 
 
 def sort_licenses(results: list[License]) -> list[License]:
@@ -352,7 +390,7 @@ def sort_licenses(results: list[License]) -> list[License]:
     )
 
 
-def has_head_or_footer_ancestor(tag: Tag | None) -> tuple[bool, bool]:
+def has_head_or_footer_ancestor(tag: Any | None) -> tuple[bool, bool]:
     """Check if the tag has a head ancestor or a footer ancestor. The
     options are mutually exclusive for normal HTML. The `head` cannot be in a
     `footer` element and a `footer` element cannot be in a `head` element.
@@ -380,151 +418,3 @@ def has_head_or_footer_ancestor(tag: Tag | None) -> tuple[bool, bool]:
         cur_tag = cur_tag.parent
 
     return False, False
-
-
-@deprecated("Use 'find_cc_licenses_in_html' instead.")
-def _legacy_find_cc_licenses_in_html(html: str) -> list[tuple[abbr_type, str | None, location_type, bool, bool]]:
-    """LEGACY VERSION DO NOT USE. Only intended for benchmarking.
-
-    Given an HTML document (as str), try to find all Creative Commons licenses, if any.
-
-    Args:
-        html: the HTML document as a string
-
-    Returns:
-        list[tuple[str, str, str, bool, bool]]: a list of tuples with the license abbreviation, version, location,
-        whether it was found in the head, and whether it was found in the footer
-    """
-    from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning, Tag, XMLParsedAsHTMLWarning
-
-    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
-    # Some files are malformed and only contain text like
-    # "Table './dlinksmf/smf_sessions' is marked as crashed and should be repaired"
-    # Those should not be parsed and simply be raised as an error
-    warnings.filterwarnings("error", category=MarkupResemblesLocatorWarning)
-
-    results = []
-    try:
-        soup = BeautifulSoup(html, "html.parser")
-    except Exception:
-        try:
-            soup = BeautifulSoup(html, "html5lib")
-        except Exception:
-            try:
-                soup = BeautifulSoup(html, "lxml")
-            except Exception:
-                raise ParserException("Could not parse the document with html.parser, html5lib, nor lxml.")
-
-    def parse_content_license(potential_cc_url: str, license_place: str, tag: Tag):
-        if potential_cc_url:
-            license_abbr, license_version = parse_cc_license_url(potential_cc_url)
-            if license_abbr:
-                in_head, in_footer = _legacy_has_head_or_footer_ancestor(tag)
-                # These options are mutually exclusive
-                results.append((license_abbr, license_version, license_place, in_head, in_footer))
-
-    # Check <meta name="license"> or <meta property="og:license"> for its "content" attribute
-    for meta_tag in soup.find_all("meta"):
-        meta_name = meta_tag.get("name", "") or meta_tag.get("property", "")
-        if meta_name.lower() in ["license", "og:license"]:
-            if content := meta_tag.get("content"):
-                parse_content_license(content, "meta_tag", meta_tag)
-
-    # Check <link href="..."> or <a href="..."> for its "href" attribute
-    for tag in soup.find_all(("link", "a")):
-        if href := tag.get("href"):
-            parse_content_license(href, f"{tag.name}_tag", tag)
-
-    # Check JSON-LD (Schema.org) for "license": "...", usually in <script type="application/ld+json">
-    # Example JSON-LD:
-    # <script type="application/ld+json">
-    # {
-    #     "@context": "http://schema.org",
-    #     "@type": "CreativeWork",
-    #     "license": {
-    #         "@type": "CreativeWork",
-    #         "url": "https://creativecommons.org/licenses/by-nc-nd/4.0/"
-    #     }
-    # }
-    for script_tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
-        try:
-            data = json.loads(script_tag.string or "")
-        except json.JSONDecodeError:
-            continue
-        else:
-            # data could be a list or dict
-            if isinstance(data, dict):
-                data_list = [data]
-            elif isinstance(data, list):
-                data_list = data
-            else:
-                data_list = []
-
-            for item in data_list:
-                if isinstance(item, dict) and "license" in item:
-                    license_val = item["license"]
-                    # license_val might be a string or dict (if typed)
-                    if isinstance(license_val, dict):
-                        # Some schema.org usage might embed the URL in "@id" or "url"
-                        if license_url := license_val.get("@id") or license_val.get("url"):
-                            parse_content_license(license_url, "json-ld", script_tag)
-                    elif isinstance(license_val, str):
-                        parse_content_license(license_val, "json-ld", script_tag)
-
-    return _legacy_sort_licenses(results)
-
-
-@deprecated("Use 'has_head_or_footer_ancestor' instead.")
-def _legacy_has_head_or_footer_ancestor(tag) -> tuple[bool, bool]:
-    """LEGACY VERSION DO NOT USE. Only intended for benchmarking.
-
-    Check if the tag has a head ancestor or a footer ancestor. The
-    options are mutually exclusive for normal HTML. The `head` cannot be in a
-    `footer` element and a `footer` element cannot be in a `head` element.
-
-    Args:
-        tag: the bs4 Tag to check
-
-    Returns:
-        tuple[bool]: a tuple with two booleans, the first is True if the tag has a head ancestor,
-        the second is True if the tag has a footer ancestor
-    """
-    if tag is None:
-        return False, False
-
-    if tag.name.lower() == "head":
-        return True, False
-    elif (
-        tag.name.lower() == "footer"
-        or any("footer" in cls.lower() for cls in tag.get("class", []))
-        or "footer" in tag.get("id", "").lower()
-    ):
-        return False, True
-
-    return has_head_or_footer_ancestor(tag.parent)
-
-
-@deprecated("Use 'sort_licenses' instead.")
-def _legacy_sort_licenses(results: list[tuple]) -> list[tuple]:
-    """LEGACY VERSION DO NOT USE. Only intended for benchmarking.
-
-    Sort the license results (list of tuples) by the following order of preference for each item in the tuple:
-    1. location_preference_order: meta_tag, json-ld, link_tag, a_tag
-    2. head_preference_order: True, False
-    3. footer_preference_order: True, False
-
-    Args:
-        results: the list of license results to sort. Each result is a tuple with the license abbreviation, version,
-        location, whether it was found in the head, and whether it was found in the footer
-
-    Returns:
-        list[License]: the sorted list of license results
-    """
-    return sorted(
-        results,
-        key=lambda lic: (
-            location_preference_order.index(lic[2]),
-            head_preference_order.index(lic[3]),
-            footer_preference_order.index(lic[4]),
-        ),
-    )
