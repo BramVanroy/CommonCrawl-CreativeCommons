@@ -1,7 +1,8 @@
 import json
 import re
 import warnings
-from typing import Literal, NamedTuple
+from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import unquote
 
 from bs4 import Tag
@@ -27,6 +28,9 @@ class LicenseAnnotator(BaseAnnotator):
         license_location = None
         license_in_head = None
         license_in_footer = None
+        license_tag = None
+        license_left_context = None
+        license_right_context = None
 
         potential_licenses = None
         license_parse_error = None
@@ -38,7 +42,7 @@ class LicenseAnnotator(BaseAnnotator):
             html = doc.text
 
         try:
-            # List of tuples (license_abbr, license_version, location_found)
+            # List of License objects
             potential_licenses = find_cc_licenses_in_html(html)
         except Exception:
             license_parse_error = True
@@ -48,17 +52,30 @@ class LicenseAnnotator(BaseAnnotator):
                 # Licenses are sorted by the best match
                 # Order of preference based on where the license was found: meta_tag, json-ld, link_tag, a_tag
                 extracted_license = potential_licenses[0]
-                license_abbr, license_version, license_location, license_in_head, license_in_footer = extracted_license
+                license_abbr = extracted_license.abbr
+                license_version = extracted_license.version
+                license_location = extracted_license.location
+                license_in_head = extracted_license.in_head
+                license_in_footer = extracted_license.in_footer
+                license_tag = extracted_license.tag
+                license_left_context = extracted_license.left_context
+                license_right_context = extracted_license.right_context
+
                 # If not all licenses have the same abbreviation, there is a disagreement
-                license_disagreement = len({lic[0] for lic in potential_licenses}) > 1
+                license_disagreement = len({lic.abbr for lic in potential_licenses}) > 1
                 # Restructure licenses to be a dictionary because Arrow does not allow lists of heterogeneous types
-                potential_licenses = {k: [r[i] for r in potential_licenses] for i, k in enumerate(license_tuple_keys)}
+                potential_licenses = {
+                    attr: [getattr(lic, attr) for lic in potential_licenses] for attr in license_tuple_keys
+                }
 
         doc.metadata["license_abbr"] = license_abbr
         doc.metadata["license_version"] = license_version
         doc.metadata["license_location"] = license_location
         doc.metadata["license_in_head"] = license_in_head
         doc.metadata["license_in_footer"] = license_in_footer
+        doc.metadata["license_tag"] = license_tag
+        doc.metadata["license_left_context"] = license_left_context
+        doc.metadata["license_right_context"] = license_right_context
 
         doc.metadata["potential_licenses"] = potential_licenses
         doc.metadata["license_parse_error"] = license_parse_error
@@ -80,19 +97,25 @@ abbr_type = Literal[
 location_preference_order = ["meta_tag", "json-ld", "link_tag", "a_tag"]
 head_preference_order = [True, False]
 footer_preference_order = [True, False]
-license_tuple_keys = ("abbr", "version", "location", "in_head", "in_footer")
 
 # Compiled regexes
 CC_URL_REGEX = re.compile(r"creativecommons\.org/(?:licenses|publicdomain)/([^/]+)/(\d\.\d)")
 LICENSE_CODE_CLEANUP_REGEX = re.compile(r"^[^a-z]+|[^a-z]+$")
 
 
-class License(NamedTuple):
+@dataclass
+class License:
     abbr: abbr_type | None
     version: str | None
     location: location_type
     in_head: bool
     in_footer: bool
+    tag: Tag | str
+    left_context: str | None = None
+    right_context: str | None = None
+
+
+license_tuple_keys = tuple(License.__dataclass_fields__.keys())
 
 
 def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None]:
@@ -120,6 +143,7 @@ def parse_cc_license_url(license_url: str) -> tuple[abbr_type | None, str | None
         return "cc-unknown", None
 
     license_code = match.group(1)  # e.g. 'by-nc-nd' or 'zero'
+    # remove leading/trailing non-alphabetic chars
     license_code = LICENSE_CODE_CLEANUP_REGEX.sub("", license_code)
     version = match.group(2)  # e.g. '4.0' or '1.0'
 
@@ -175,7 +199,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                 soup = BeautifulSoup(html, "html5lib")
             except Exception as e_html5lib:
                 raise ParserException(
-                    f"Failed with lxml and html.parser. lxml error: {e_lxml}, html.parser error: {e_htmlparser}, html5lib error: {e_html5lib}"
+                    f"Failed with lxml, html.parser and html5lib. lxml error: {e_lxml}, html.parser error: {e_htmlparser}, html5lib error: {e_html5lib}"
                 )
 
     def parse_content_license(potential_cc_url: str, license_place: str, tag: Tag):
@@ -191,6 +215,7 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                         location=license_place,
                         in_head=in_head,
                         in_footer=in_footer,
+                        tag=tag,
                     )
                 )
 
@@ -254,7 +279,54 @@ def find_cc_licenses_in_html(html: str) -> list[License]:
                         elif isinstance(license_val, str):
                             parse_content_license(license_val, "json-ld", script_tag)
 
-    return sort_licenses(results)
+    # Add context to licenses and sort the licenses
+    return sort_licenses(add_license_contexts(soup, results))
+
+
+TEMP_MARKER_ATTR = "data-c5-ctx-marker"
+
+
+def add_license_contexts(soup, licenses: list[License], context_length: int = 120):
+    """
+    Extracts multiple specified BeautifulSoup Tag objects as strings with surrounding context,
+    optimized for speed.
+
+    Args:
+        soup: The BeautifulSoup soup object.
+        elements: A list of specific BeautifulSoup Tag objects from original_soup.
+        context_length: The number of characters of context.
+
+    Returns:
+        A list of strings, each containing the context, the element, and context.
+        Returns error messages for elements that couldn't be processed.
+    """
+    if not licenses:
+        return
+
+    # Add a unique attribute to quickly find the elements in the HTML string, even if the
+    # tags are exact duplicates themselves
+    for idx, lcns in enumerate(licenses):
+        lcns.tag[TEMP_MARKER_ATTR] = str(idx)
+
+    full_html_cleaned = " ".join(str(soup).split())
+    html_len = len(full_html_cleaned)
+
+    for lcns in licenses:
+        search_str = str(lcns.tag)
+        start_index = full_html_cleaned.index(search_str)
+        end_index = start_index + len(search_str)
+
+        context_before_start = max(0, start_index - context_length)
+        context_before = full_html_cleaned[context_before_start:start_index]
+        lcns.left_context = context_before
+
+        context_after_end = min(html_len, end_index + context_length)
+        context_after = full_html_cleaned[end_index:context_after_end]
+        lcns.right_context = context_after
+        del lcns.tag[TEMP_MARKER_ATTR]
+        lcns.tag = str(lcns.tag)  # For easier serialization
+
+    return licenses
 
 
 def sort_licenses(results: list[License]) -> list[License]:

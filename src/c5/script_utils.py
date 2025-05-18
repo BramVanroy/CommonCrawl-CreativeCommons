@@ -13,7 +13,7 @@ from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel
 
-from c5.components.annotators import FWDBContainmentAnnotator, FWSingleDBContainmentAnnotator, LicenseAnnotator
+from c5.components.annotators import FWSingleDBContainmentAnnotator, LicenseAnnotator
 from c5.components.filters import EmptyTextFilter, LanguageFilterWithIgnore, LicenseFilter
 from c5.components.readers.robust_jsonl import RobustJsonlReader
 from c5.data_utils import get_fw2_language_threshold
@@ -53,7 +53,7 @@ LANGUAGES_EU = [
     "slk_Latn",
     "slv_Latn",
     "spa_Latn",
-    "swe_Latn"
+    "swe_Latn",
 ]
 
 
@@ -144,11 +144,13 @@ def build_main_pipeline(
     if "eng_Latn" in languages:
         # Add the English language threshold to the thresholds
         lang_thresholds["eng_Latn"] = 0.65
-    
+
     if languages is not None:
         for lang in languages:
             if lang not in lang_thresholds:
-                raise ValueError(f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data.")
+                raise ValueError(
+                    f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data."
+                )
 
     return [
         WarcReader(
@@ -165,9 +167,7 @@ def build_main_pipeline(
         Trafilatura(favour_precision=True, timeout=60.0, deduplicate=False),
         EmptyTextFilter(),  # filter items with empty extracted text -- should be rare but it's cheap
         LanguageFilterWithIgnore(
-            languages=languages,
-            ignore_language_prefixes=ignore_languages,
-            language_threshold=lang_thresholds
+            languages=languages, ignore_language_prefixes=ignore_languages, language_threshold=lang_thresholds
         ),
         # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py:
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
@@ -427,6 +427,7 @@ def get_dumps_with_duckdb(
 
     return ignore_duckdb_for, ignore_all_duckdb
 
+
 def retrieve_supported_languages(include_english: bool = True) -> list[str]:
     """
     Retrieve the list of supported languages from the FineWeb-2 DuckDB databases.
@@ -439,11 +440,17 @@ def retrieve_supported_languages(include_english: bool = True) -> list[str]:
     Returns:
         list[str]: List of supported languages, e.g. ["eng_Latn", "fra_Latn", "aak_Latn", ...].
     """
-    fnames = list_repo_files(repo_id="BramVanroy/fineweb-2-duckdbs", repo_type="dataset",)
-    languages = [f.replace("fw2-", "").replace(".duckdb", "") for f in fnames if f.endswith(".duckdb") and "_removed" not in f]
+    fnames = list_repo_files(
+        repo_id="BramVanroy/fineweb-2-duckdbs",
+        repo_type="dataset",
+    )
+    languages = [
+        f.replace("fw2-", "").replace(".duckdb", "") for f in fnames if f.endswith(".duckdb") and "_removed" not in f
+    ]
     if include_english:
         languages += ["eng_Latn"]
     return languages
+
 
 def download_duckdbs(dump_name: str, fw_duckdb_path: str, cfg: BaseConfig) -> tuple[list[str], bool]:
     """

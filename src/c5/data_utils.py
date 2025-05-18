@@ -93,10 +93,11 @@ def yield_repo_parquet_files(
                 yield remote_parquet_uri, local_fname
                 break
 
+
 def get_fw2_language_threshold(languages: list[str]) -> dict[str, float]:
     """
     Get the language threshold for the given languages from the FineWeb-2 repository.
-    
+
     Args:
         languages (list[str]): A list of languages to get the thresholds for.
 
@@ -121,7 +122,7 @@ def download_fw2_language_configs(languages: list[str]) -> str:
 
     Args:
         languages (list[str]): A list of languages to download the configs for.
-    
+
     Returns:
         str: The path to the directory where the configs are downloaded.
     """
@@ -132,7 +133,7 @@ def download_fw2_language_configs(languages: list[str]) -> str:
     for language in languages:
         if language == "eng_Latn":
             continue
-        
+
         pfout = pdout / f"{language}.yml"
         if pfout.exists():
             print(f"[{language}] Already downloaded, skipping...")

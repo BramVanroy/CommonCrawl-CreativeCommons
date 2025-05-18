@@ -1,4 +1,3 @@
-from operator import is_
 from pathlib import Path
 
 import yaml
@@ -58,7 +57,7 @@ def main(
         else:
             duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
 
-        containment_pipeline = build_containment_pipeline(            
+        containment_pipeline = build_containment_pipeline(
             input_path=main_dump_output_path + language + "/",
             duckdb_path=duckdb_path,
             is_fw2=is_fw2,

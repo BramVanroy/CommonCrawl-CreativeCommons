@@ -1,5 +1,4 @@
 from collections import defaultdict
-from functools import cached_property
 
 from datatrove.data import Document
 from datatrove.pipeline.filters.language_filter import LanguageFilter
@@ -27,7 +26,7 @@ class LanguageFilterWithIgnore(LanguageFilter):
         Args:
             languages: list of languages to keep. None for all
             ignore_language_prefixes: list of languages to ignore. If the language is in this list, the document is removed
-                regardless of the language score. 
+                regardless of the language score.
             language_threshold: language_threshold minimum score to accept a document. Can be a float or a dict with
                 language as key and threshold as value.
             exclusion_writer:

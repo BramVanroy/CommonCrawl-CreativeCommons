@@ -19,12 +19,12 @@ try:
 
     repo_data = response.json()
 
-    if 'siblings' in repo_data and isinstance(repo_data['siblings'], list):
-        for file_info in repo_data['siblings']:
-            if 'rfilename' in file_info and 'size' in file_info:
-                if file_info['rfilename'].endswith(".duckdb") and "_removed" not in file_info['rfilename']:
-                    file_name = file_info['rfilename']
-                    file_size = file_info['size'] # This should be in bytes as per the API
+    if "siblings" in repo_data and isinstance(repo_data["siblings"], list):
+        for file_info in repo_data["siblings"]:
+            if "rfilename" in file_info and "size" in file_info:
+                if file_info["rfilename"].endswith(".duckdb") and "_removed" not in file_info["rfilename"]:
+                    file_name = file_info["rfilename"]
+                    file_size = file_info["size"]  # This should be in bytes as per the API
 
                     if isinstance(file_size, (int, float)) and file_size >= 0:
                         duckdb_files_info.append({"name": file_name, "size": file_size})
@@ -35,7 +35,7 @@ try:
                 print(f"Warning: Skipping sibling due to missing 'rfilename' or 'size': {file_info}")
     else:
         print("Error: 'siblings' key not found in API response or is not a list.")
-        print("API Response snippet:", response.text[:500]) # Print a snippet for debugging
+        print("API Response snippet:", response.text[:500])  # Print a snippet for debugging
 
 except requests.exceptions.Timeout:
     print(f"Error: The request to {api_url} timed out after {request_timeout_seconds} seconds.")

@@ -1,8 +1,9 @@
 import random
-from typing import Callable, Literal
 from pathlib import Path
-from datatrove.io import DataFileLike, DataFolderLike, get_shard_from_paths_file
+from typing import Callable, Literal
+
 from datatrove.data import DocumentsPipeline
+from datatrove.io import DataFileLike, DataFolderLike, get_shard_from_paths_file
 from datatrove.pipeline.readers import JsonlReader
 from datatrove.utils.logging import logger
 
@@ -67,7 +68,7 @@ class RobustJsonlReader(JsonlReader):
             default_metadata=default_metadata,
             recursive=recursive,
             glob_pattern=glob_pattern,
-            shuffle_files=shuffle_files
+            shuffle_files=shuffle_files,
         )
 
     def run(self, data: DocumentsPipeline = None, rank: int = 0, world_size: int = 1) -> DocumentsPipeline:

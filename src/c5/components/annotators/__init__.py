@@ -1,4 +1,4 @@
 from c5.components.annotators.db_containment_annotator import FWDBContainmentAnnotator
+from c5.components.annotators.db_containment_annotator_single import FWSingleDBContainmentAnnotator
 from c5.components.annotators.html_copier import HtmlCopier
 from c5.components.annotators.license_annotator import LicenseAnnotator
-from c5.components.annotators.db_containment_annotator_single import FWSingleDBContainmentAnnotator
