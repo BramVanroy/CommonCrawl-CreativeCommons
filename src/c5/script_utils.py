@@ -244,6 +244,9 @@ SCHEMA = pa.schema(
         pa.field("license_location", pa.string(), nullable=False),
         pa.field("license_in_head", pa.bool_(), nullable=False),
         pa.field("license_in_footer", pa.bool_(), nullable=False),
+        pa.field("license_element", pa.string(), nullable=False),
+        pa.field("license_left_context", pa.string(), nullable=False),
+        pa.field("license_right_context", pa.string(), nullable=False),
         pa.field(
             "potential_licenses",
             pa.struct(
@@ -253,6 +256,9 @@ SCHEMA = pa.schema(
                     pa.field("in_head", pa.list_(pa.bool_()), nullable=False),
                     pa.field("location", pa.list_(pa.string()), nullable=False),
                     pa.field("version", pa.list_(pa.string()), nullable=False),
+                    pa.field("element", pa.list_(pa.string()), nullable=False),
+                    pa.field("left_context", pa.list_(pa.string()), nullable=False),
+                    pa.field("right_context", pa.list_(pa.string()), nullable=False),
                 ]
             ),
         ),
@@ -278,6 +284,9 @@ SCHEMA_NULLABLE = pa.schema(
         pa.field("license_location", pa.string()),
         pa.field("license_in_head", pa.bool_()),
         pa.field("license_in_footer", pa.bool_()),
+        pa.field("license_element", pa.string()),
+        pa.field("license_left_context", pa.string()),
+        pa.field("license_right_context", pa.string()),
         pa.field(
             "potential_licenses",
             pa.struct(
@@ -287,6 +296,9 @@ SCHEMA_NULLABLE = pa.schema(
                     pa.field("in_head", pa.list_(pa.bool_())),
                     pa.field("location", pa.list_(pa.string())),
                     pa.field("version", pa.list_(pa.string())),
+                    pa.field("element", pa.list_(pa.string())),
+                    pa.field("left_context", pa.list_(pa.string())),
+                    pa.field("right_context", pa.list_(pa.string())),
                 ]
             ),
         ),
@@ -299,6 +311,7 @@ SCHEMA_NULLABLE = pa.schema(
     ]
 )
 
+# Deprecated
 FW2_SCHEMA = pa.schema(
     [
         pa.field("text", pa.string(), nullable=False),
@@ -333,6 +346,7 @@ FW2_SCHEMA = pa.schema(
     ]
 )
 
+# Deprecated
 NO_FW_SCHEMA = pa.schema(
     [
         pa.field("text", pa.string(), nullable=False),

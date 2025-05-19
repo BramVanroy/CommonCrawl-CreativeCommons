@@ -57,6 +57,12 @@ class LanguageFilterWithIgnore(LanguageFilter):
         elif not isinstance(self.language_threshold, dict):
             raise ValueError("language_threshold must be a float or a dict")
 
+        print("LANGUAGE FILTER")
+        print("LANGUAGES", self.languages)
+        print("IGNORE LANGUAGES", self.ignore_language_prefix)
+        print("LANGUAGE THRESHOLD", self.language_threshold)
+        print("LABEL ONLY", self.label_only)
+
     def filter(self, doc: Document) -> bool | tuple[bool, str]:
         """Args:
             doc: document

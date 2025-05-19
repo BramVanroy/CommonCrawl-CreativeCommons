@@ -1,3 +1,5 @@
+import gzip
+import json
 import time
 from pathlib import Path
 from typing import Generator
@@ -6,6 +8,7 @@ import requests
 import yaml
 from huggingface_hub.file_download import hf_hub_download
 from huggingface_hub.hf_api import list_repo_files
+from tqdm import tqdm
 
 
 def yield_repo_parquet_files(
@@ -159,3 +162,36 @@ def download_fw2_language_configs(languages: list[str]) -> str:
                 break
 
     return str(pdout)
+
+
+def yield_jsonl_gz_data_robust(pfiles: list[Path], disable_tqdm: bool = False):
+    """
+    Given a set of .jsonl.gz files, this function reads them in a robust way, skipping incomplete lines,
+    and yielding one sample at a time (parse-able JSON line).
+
+    :param pfiles: A list of .jsonl.gz files
+    :return: A generator yielding the contents of the files
+    """
+    with tqdm(total=len(pfiles), desc="Reading", unit="file", disable=disable_tqdm) as pbar:
+        for pfin in pfiles:
+            if pfin.stat().st_size == 0:
+                continue
+
+            with gzip.open(pfin, "rt", encoding="utf-8") as fhin:
+                num_failures = 0
+                while True:
+                    try:
+                        line = fhin.readline()
+                        if not line:
+                            break  # End of currently available content
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        # Handle partial or malformed JSON (incomplete writes)
+                        num_failures += 1
+                    except EOFError:
+                        # Handle unexpected EOF in gzip
+                        num_failures += 1
+                        break
+                if num_failures:
+                    print(f"Skipped {num_failures:,} corrupt line(s) in {pfin}")
+            pbar.update(1)

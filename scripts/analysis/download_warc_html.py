@@ -27,7 +27,7 @@ def download_warc_file(file_url, local_file_path):
                 pbar.update(len(chunk))
         print(f"Downloaded WARC file to {local_file_path}")
     else:
-        raise Exception(f"Failed to download WARC file: HTTP {response.status_code}")
+        raise Exception(f"Failed to download WARC file: HTTP {response.status_code}. {response.text}")
 
 
 def extract_html_from_warc(warc_file_path, target_uuid):
@@ -49,6 +49,9 @@ def main(
     warc_path: str = "crawl-data/CC-MAIN-2013-20/segments/1368702730377/warc/CC-MAIN-20130516111210-00038-ip-10-60-113-184.ec2.internal.warc.gz",
     tmp_local_warc_file="downloaded_warc_file.warc.gz",
 ):
+    if warc_path.startswith("s3://"):
+        warc_path = warc_path.replace("s3://commoncrawl/", "")
+
     file_url = f"https://data.commoncrawl.org/{warc_path}"
 
     try:
@@ -72,4 +75,7 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main(
+        target_uuid="<urn:uuid:f9780457-9d15-40a1-a816-b85a0ef25a54>",
+        warc_path="s3://commoncrawl/crawl-data/CC-MAIN-2021-04/segments/1610703495901.0/warc/CC-MAIN-20210115134101-20210115164101-00004.warc.gz",
+    )
