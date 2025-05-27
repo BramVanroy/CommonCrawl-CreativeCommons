@@ -14,7 +14,8 @@ maintainers = [
 description = "Software to build the Common Crawl Creative Commons Corpus (C5)"
 readme = "README.md"
 keywords = ["data creation", "creative commons", "data annotation", "common crawl"]
-license = {file = "LICENSE"}
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -25,7 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
+    "License :: OSI Approved :: Apache Software License"
 ]
 
 requires-python = ">=3.10"
