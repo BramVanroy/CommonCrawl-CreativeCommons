@@ -80,7 +80,7 @@ class LanguageFilterWithIgnore(LanguageFilter):
                 break
         else:
             if not self.label_only:
-                return False, "no language above its threshold"
+                return False, "no_language_above_its_threshold"
             else:
                 # If no language matches its threshold, we can still return the best one
                 # which is the first one in the sorted dictionary
@@ -89,17 +89,15 @@ class LanguageFilterWithIgnore(LanguageFilter):
         lang, lang_score = best_lang_pair
 
         if not self.label_only and self.languages is not None and lang not in self.languages:
-            return False, f"language {lang} not in {self.languages}"
+            return False, f"{lang}_not_in_requested_languages"
 
         lang, script = lang.split("_")
 
         if not self.label_only:
             # Loop so we can provide the language that was ignored in reasoning
             for ignore_lang in self.ignore_language_prefix:
-                # If using glotlid: at this point `lang` is the language code, not include the script
-                # the script is in `doc.metadata["language_script"]`
                 if lang == ignore_lang:
-                    return False, f"language in ignore list: {ignore_lang}"
+                    return False, f"{lang}_in_ignore_list"
 
         doc.metadata["language_script"] = script
         doc.metadata["language"] = lang
