@@ -64,7 +64,6 @@ repository = "https://github.com/BramVanroy/CommonCrawl-CreativeCommons.git"
 # TOOLS
 [tool.setuptools]
 include-package-data = true
-license-files = ["LICEN[CS]E*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
