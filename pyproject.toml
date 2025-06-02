@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "c5"
 dynamic = ["version"]
 authors = [
-    {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
+    {name = "Bram Vanroy", email = "bram.vanroy@ivdnt.org"},
 ]
 maintainers = [
-    {name = "Bram Vanroy", email = "bramvanroy@hotmail.com"},
+    {name = "Bram Vanroy", email = "bram.vanroy@ivdnt.org"},
 ]
 description = "Software to build the Common Crawl Creative Commons Corpus (C5)"
 readme = "README.md"
@@ -22,14 +22,12 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
     "Topic :: Text Processing",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
-    "License :: OSI Approved :: Apache Software License"
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.7.0,<5",
     "datasets>3,<4",
