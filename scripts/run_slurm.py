@@ -61,36 +61,44 @@ def main(
     )
 
     # Do containment checking (separately because it's intensive on storage)
-    dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
-    containment_pipeline = build_containment_pipeline(
-        fw_duckdb_path=fw_duckdb_path,
-        fw2_duckdb_templ_path=cfg.fw2_duckdb_templ_path,
-        ignore_duckdb_for=ignore_duckdb_for,
-        input_path=main_dump_output_path,
-        output_path=dump_output_path,
-        overwrite_with_none=ignore_all_duckdb or cfg.overwrite_with_none,
-    )
-    containment_executor = SlurmPipelineExecutor(
-        pipeline=containment_pipeline,
-        job_id_retriever=job_id_retriever,
-        tasks=cfg.containment_tasks,
-        workers=cfg.containment_workers,
-        time=cfg.containment_time,
-        logging_dir=str(PROJECT_ROOT / "logs" / "containment-logs" / dump),
-        slurm_logs_folder=str(PROJECT_ROOT / "slurm-logs" / "containment-logs" / dump),
-        mem_per_cpu_gb=cfg.containment_mem_per_cpu_gb,
-        cpus_per_task=cfg.containment_cpus_per_task,
-        partition=partition,
-        venv_path=venv_path,
-        qos="",
-        sbatch_args=sbatch_args,
-        job_name="process-containment",
-        depends=main_executor,
-        max_array_launch_parallel=cfg.max_array_launch_parallel,
-        stagger_max_array_jobs=cfg.stagger_max_array_jobs,
-    )
+    containment_dump_output_path = output_path.rstrip("/") + "/" + dump + "/"
+    for language in cfg.languages:
+        is_fw2 = language != "eng_Latn"
+        ignore_duckdb = language in ignore_duckdb_for
 
-    containment_executor.run()
+        if is_fw2:
+            duckdb_path = cfg.fw2_duckdb_templ_path.format(dump=dump, language=language)
+        else:
+            duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
+
+        containment_pipeline = build_containment_pipeline(
+            input_path=main_dump_output_path + language + "/",
+            duckdb_path=duckdb_path,
+            is_fw2=is_fw2,
+            overwrite_with_none=ignore_duckdb,
+            output_folder=containment_dump_output_path,
+        )
+        containment_executor = SlurmPipelineExecutor(
+            pipeline=containment_pipeline,
+            job_id_retriever=job_id_retriever,
+            tasks=cfg.containment_tasks,
+            workers=cfg.containment_workers,
+            time=cfg.containment_time,
+            logging_dir=str(PROJECT_ROOT / "logs" / "containment-logs" / dump / language),
+            slurm_logs_folder=str(PROJECT_ROOT / "slurm-logs" / "containment-logs" / dump / language),
+            mem_per_cpu_gb=cfg.containment_mem_per_cpu_gb,
+            cpus_per_task=cfg.containment_cpus_per_task,
+            partition=partition,
+            venv_path=venv_path,
+            qos="",
+            sbatch_args=sbatch_args,
+            job_name="process-containment",
+            depends=main_executor,
+            max_array_launch_parallel=cfg.max_array_launch_parallel,
+            stagger_max_array_jobs=cfg.stagger_max_array_jobs,
+        )
+
+        containment_executor.run()
 
 
 if __name__ == "__main__":
