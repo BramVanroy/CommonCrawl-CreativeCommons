@@ -163,8 +163,7 @@ def build_main_pipeline(
         EmptyTextFilter(),  # filter items with empty HTML (text-attr = read HTML at this point) -- cheap
         LicenseAnnotator(),
         LicenseFilter(),
-        # Setting deduplicate to False because of its destructive nature -- https://github.com/adbar/trafilatura/issues/778
-        Trafilatura(favour_precision=True, timeout=60.0, deduplicate=False),
+        Trafilatura(favour_precision=True, timeout=120.0, deduplicate=True),
         EmptyTextFilter(),  # filter items with empty extracted text -- should be rare but it's cheap
         LanguageFilterWithIgnore(
             languages=languages, ignore_language_prefixes=ignore_languages, language_threshold=lang_thresholds
