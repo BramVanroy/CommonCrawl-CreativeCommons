@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import sys
 import argparse
 import concurrent.futures
 import math
 import re
+import sys
 from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
 
 PATTERN = re.compile(
@@ -19,6 +19,7 @@ PATTERN = re.compile(
 
 class RuntimeParseError(Exception):
     """Raised when a log file does not contain a valid Total Runtime line."""
+
     def __init__(self, file_path: Path):
         super().__init__(f"No valid runtime found in file: {file_path}")
         self.file_path = file_path
@@ -36,7 +37,9 @@ def parse_runtime_from_file(file_path: Path) -> Tuple[Path, int]:
                 seconds = int(match.group(4) or 0)
                 total_seconds = days * 86400 + hours * 3600 + minutes * 60 + seconds
                 if total_seconds == 0:
-                    raise ValueError(f"Got 0 seconds for {file_path} on this line: '{line}'. Extracted values: days: {days}, hours: {hours}, minutes: {minutes}, seconds: {seconds}.")
+                    raise ValueError(
+                        f"Got 0 seconds for {file_path} on this line: '{line}'. Extracted values: days: {days}, hours: {hours}, minutes: {minutes}, seconds: {seconds}."
+                    )
                 return file_path, total_seconds
     raise RuntimeParseError(file_path)
 
@@ -49,7 +52,7 @@ def format_seconds(s: int) -> str:
 
 def print_progress(count: int, total: int, bar_len: int = 40) -> None:
     filled = int(bar_len * count / total)
-    bar = '#' * filled + ' ' * (bar_len - filled)
+    bar = "#" * filled + " " * (bar_len - filled)
     percent = int(100 * count / total)
     print(f"\r[{bar}] {percent:3d}% ({count}/{total})", end="", flush=True)
 
@@ -96,10 +99,7 @@ def main() -> None:
     errors: List[RuntimeParseError] = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_idx = {
-            executor.submit(parse_runtime_from_file, path): idx
-            for idx, path in enumerate(log_files)
-        }
+        future_to_idx = {executor.submit(parse_runtime_from_file, path): idx for idx, path in enumerate(log_files)}
         completed = 0
         for future in concurrent.futures.as_completed(future_to_idx):
             idx = future_to_idx[future]
@@ -108,7 +108,7 @@ def main() -> None:
                 results[idx] = total_seconds
             except RuntimeParseError as e:
                 errors.append(e)
-            except Exception as e:
+            except Exception:
                 # Propagate unknown errors immediately.
                 raise
             completed += 1
@@ -139,4 +139,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\nFatal error: {e}", file=sys.stderr)
         raise
-
