@@ -45,6 +45,7 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
     languages = cfg.languages
     containment_tasks = plog_dir / "containment-logs" / crawl_name
     lang_dirs = [containment_tasks / lang for lang in languages]
+    had_error = False
     for lang_dir in lang_dirs:
         if not lang_dir.exists():
             print(f"[WARNING] Language directory {lang_dir} does not exist. Might be problematic.")
@@ -55,8 +56,10 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
             continue
         if missing_files := all_files_accounted_for(completions_dir, num_containment_tasks):
             print(f"[WARNING] Containment tasks for {lang_dir.name} missing files: {missing_files}")
-        else:
-            print(f"[INFO] All containment tasks for {lang_dir.name} completed successfully.")
+            had_error = True
+    
+    if not had_error:
+        print("[INFO] All containment tasks completed successfully for all languages.")
 
     # Upload tasks
     pf_upl_config = Path(upload_config_file)
