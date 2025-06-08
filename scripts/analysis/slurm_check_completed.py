@@ -8,7 +8,7 @@ from c5.script_utils import SlurmConfig, SlurmUploadConfig
 def all_files_accounted_for(pdir: Path, num_files: int) -> set[int]:
     # Generate zero filled file names based on the expected number of files, e.g. 03784
     expected_fnames = {f"{i:05d}" for i in range(num_files)}
-    actual_fnames = {p.name for p in pdir.iterdir if p.is_file()}
+    actual_fnames = {p.name for p in pdir.iterdir() if p.is_file()}
 
     # Return the set of missing file names
     return expected_fnames - actual_fnames
@@ -37,6 +37,8 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
 
     if missing_files := all_files_accounted_for(main_completions, num_main_tasks):
         print(f"[ERROR] Main tasks missing files: {missing_files}")
+    else:
+        print("[INFO] All main tasks completed successfully.")
 
     # Containment tasks
     num_containment_tasks = cfg.containment_tasks
@@ -53,9 +55,11 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
             continue
         if missing_files := all_files_accounted_for(completions_dir, num_containment_tasks):
             print(f"[WARNING] Containment tasks for {lang_dir.name} missing files: {missing_files}")
+        else:
+            print(f"[INFO] All containment tasks for {lang_dir.name} completed successfully.")
 
     # Upload tasks
-    pf_upl_config = Path(config_file)
+    pf_upl_config = Path(upload_config_file)
     upl_cfg = yaml.safe_load(pf_upl_config.read_text(encoding="utf-8"))
     upl_cfg = SlurmUploadConfig(**upl_cfg)
     num_upload_tasks = upl_cfg.tasks
@@ -64,6 +68,8 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
         raise FileNotFoundError(f"[ERROR] Upload completions directory {upload_tasks} does not exist.")
     if missing_files := all_files_accounted_for(upload_tasks, num_upload_tasks):
         print(f"[ERROR] Upload tasks missing files: {missing_files}")
+    else:
+        print("[INFO] All upload tasks completed successfully.")
 
     print("[INFO] All checks completed. If no errors were reported, everything is fine.")
 
