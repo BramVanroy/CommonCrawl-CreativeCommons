@@ -48,19 +48,22 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
     had_error = False
     for lang_dir in lang_dirs:
         if not lang_dir.exists():
-            print(f"[WARNING] Language directory {lang_dir} does not exist. Might be problematic.")
+            had_error = True
+            print(f"[WARNING] Language directory {lang_dir} does not exist. Likely to be problematic.")
             continue
         completions_dir = lang_dir / "completions"
         if not completions_dir.exists():
+            had_error = True
             print(f"[ERROR] Completions directory {completions_dir} does not exist for language {lang_dir.name}.")
-            continue
-        if missing_files := all_files_accounted_for(completions_dir, num_containment_tasks):
+        elif missing_files := all_files_accounted_for(completions_dir, num_containment_tasks):
             print(f"[WARNING] Containment tasks for {lang_dir.name} missing files: {missing_files}")
             had_error = True
     
-    if not had_error:
+    if had_error:
+        print("[ERROR] Some containment tasks had issues. Please check the warnings above.")
+    else:
         print("[INFO] All containment tasks completed successfully for all languages.")
-
+        
     # Upload tasks
     pf_upl_config = Path(upload_config_file)
     upl_cfg = yaml.safe_load(pf_upl_config.read_text(encoding="utf-8"))
@@ -73,9 +76,6 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
         print(f"[ERROR] Upload tasks missing files: {missing_files}")
     else:
         print("[INFO] All upload tasks completed successfully.")
-
-    print("[INFO] All checks completed. If no errors were reported, everything is fine.")
-
 
 if __name__ == "__main__":
     import argparse
