@@ -49,7 +49,9 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
     for lang_dir in lang_dirs:
         if not lang_dir.exists():
             had_error = True
-            print(f"[WARNING] Language directory {lang_dir} does not exist. Likely to be problematic (though for very tiny minority languages it is technically possible to not have any results).")
+            print(
+                f"[WARNING] Language directory {lang_dir} does not exist. Likely to be problematic (though for very tiny minority languages it is technically possible to not have any results)."
+            )
             continue
         completions_dir = lang_dir / "completions"
         if not completions_dir.exists():
@@ -58,12 +60,12 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
         elif missing_files := all_files_accounted_for(completions_dir, num_containment_tasks):
             print(f"[WARNING] Containment tasks for {lang_dir.name} missing these files: {missing_files}")
             had_error = True
-    
+
     if had_error:
         print("[ERROR] Some containment tasks had issues. Please check the warnings above.")
     else:
         print("[INFO] All containment tasks completed successfully for all languages.")
-        
+
     # Upload tasks
     pf_upl_config = Path(upload_config_file)
     upl_cfg = yaml.safe_load(pf_upl_config.read_text(encoding="utf-8"))
@@ -71,11 +73,14 @@ def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: st
     num_upload_tasks = upl_cfg.tasks
     upload_tasks = plog_dir / "upload-logs" / crawl_name / "completions"
     if not upload_tasks.exists():
-        raise FileNotFoundError(f"[ERROR] Upload completions directory {upload_tasks} does not exist. Uploading not started yet?")
+        raise FileNotFoundError(
+            f"[ERROR] Upload completions directory {upload_tasks} does not exist. Uploading not started yet?"
+        )
     if missing_files := all_files_accounted_for(upload_tasks, num_upload_tasks):
         print(f"[ERROR] Upload tasks missing these files: {missing_files}")
     else:
         print("[INFO] All upload tasks completed successfully.")
+
 
 if __name__ == "__main__":
     import argparse
