@@ -14,7 +14,7 @@ from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel
 
 from c5.components.annotators import FWSingleDBContainmentAnnotator, LicenseAnnotator
-from c5.components.filters import EmptyTextFilter, LanguageFilterWithIgnore, LicenseFilter
+from c5.components.filters import CCTextFilter, LanguageFilterWithIgnore, LicenseFilter
 from c5.components.readers.robust_jsonl import RobustJsonlReader
 from c5.data_utils import get_fw2_language_threshold
 
@@ -142,7 +142,7 @@ def build_main_pipeline(
     lang_thresholds = get_fw2_language_threshold(fw2_languages)
 
     if "eng_Latn" in languages:
-        # Add the English language threshold to the thresholds
+        # Add the English language threshold to the thresholds (default value as used in FineWeb)
         lang_thresholds["eng_Latn"] = 0.65
 
     if languages is not None:
@@ -160,11 +160,10 @@ def build_main_pipeline(
             limit=limit,
         ),
         URLFilter(extra_domains=extra_domains),
-        EmptyTextFilter(),  # filter items with empty HTML (text-attr = read HTML at this point) -- cheap
+        CCTextFilter(),  # filter items without creativecommons.org in text (text-attr = read HTML at this point) -- cheap
         LicenseAnnotator(),
         LicenseFilter(),
         Trafilatura(favour_precision=True, timeout=120.0, deduplicate=True),
-        EmptyTextFilter(),  # filter items with empty extracted text -- should be rare but it's cheap
         LanguageFilterWithIgnore(
             languages=languages, ignore_language_prefixes=ignore_languages, language_threshold=lang_thresholds
         ),

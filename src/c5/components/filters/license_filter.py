@@ -20,10 +20,10 @@ class LicenseFilter(BaseFilter):
           bool | tuple[bool, str]: whether to keep the document or not, and the reason if not
 
         """
-        if "license_parse_error" in doc.metadata and doc.metadata["license_parse_error"]:
+        if doc.metadata.get("license_parse_error", False):
             return False, "license_parse_error"
 
-        if "license_abbr" not in doc.metadata or not doc.metadata["license_abbr"]:
+        if not doc.metadata.get("license_abbr", False):
             return False, "no_explicit_license"
 
         return True

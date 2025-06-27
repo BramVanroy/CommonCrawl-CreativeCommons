@@ -1,3 +1,3 @@
-from c5.components.filters.empty_text_filter import EmptyTextFilter
+from c5.components.filters.content_filters import CCTextFilter, EmptyTextFilter
 from c5.components.filters.language_filter_with_ignore import LanguageFilterWithIgnore
 from c5.components.filters.license_filter import LicenseFilter
