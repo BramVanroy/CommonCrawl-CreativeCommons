@@ -36,10 +36,6 @@ def parse_runtime_from_file(file_path: Path) -> Tuple[Path, int]:
                 minutes = int(match.group(3) or 0)
                 seconds = int(match.group(4) or 0)
                 total_seconds = days * 86400 + hours * 3600 + minutes * 60 + seconds
-                if total_seconds == 0:
-                    raise ValueError(
-                        f"Got 0 seconds for {file_path} on this line: '{line}'. Extracted values: days: {days}, hours: {hours}, minutes: {minutes}, seconds: {seconds}."
-                    )
                 return file_path, total_seconds
     raise RuntimeParseError(file_path)
 
