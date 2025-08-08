@@ -102,7 +102,7 @@ Output of the first step will be saved, by default, in `output-main/` and the fi
 
 ## Post-processing
 
-Hugging Face publicly keeps track of cease-and-desists they have received, including for domains that were removed from FineWeb(-2). I collect those domains in [this repository](BramVanroy/finewebs-copyright-domains), which in turn allows us to filter out these offending domains from our dataset. From v1.3.0 of this library, the process is done automatically. For data that has been processed with an earlier version, a [utility script](scripts/post_processing/remove_copyrighted_domains.py) is provided, which will filter
+Hugging Face publicly keeps track of cease-and-desists they have received, including for domains that were removed from FineWeb(-2). I collect those domains in [BramVanroy/finewebs-copyright-domains](https://huggingface.co/datasets/BramVanroy/finewebs-copyright-domains), which in turn allows us to filter out these offending domains from our dataset. From v1.3.0 of this library, the process is done automatically. For data that has been processed with an earlier version, a [utility script](scripts/post_processing/remove_copyrighted_domains.py) is provided, which will filter
 out offending domains on a per-parquet-file basis.
 
 ## Analysis
