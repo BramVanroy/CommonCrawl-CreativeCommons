@@ -22,7 +22,7 @@ tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
 
 
 def count(texts: list[str]) -> dict[str, list[int]]:
-    return {"num_tokens": [len(ids) for ids in tokenizer(texts)["input_ids"]]}
+    return {"num_tokens": [len(ids) for ids in tokenizer(texts, add_special_tokens=False)["input_ids"]]}
 
 
 def get_stats(dataset_name: str, num_proc: int | None = None, force_overwrite: bool = False) -> None:
@@ -141,4 +141,4 @@ if __name__ == "__main__":
         help="By default already processed crawls will not be included. You can force an override here.",
     )
     cargs = cparser.parse_args()
-    get_stats(num_proc=cargs.num_proc, force_overwrite=cargs.force_overwrite)
+    get_stats(dataset_name=cargs.dataset_name, num_proc=cargs.num_proc, force_overwrite=cargs.force_overwrite)

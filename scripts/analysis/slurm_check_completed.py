@@ -11,7 +11,7 @@ def all_files_accounted_for(pdir: Path, num_files: int) -> list[int]:
     actual_fnames = {p.name for p in pdir.iterdir() if p.is_file()}
 
     # Return the set of missing file names
-    return list(sorted(expected_fnames - actual_fnames))
+    return sorted(expected_fnames - actual_fnames)
 
 
 def main(config_file: str, upload_config_file: str, log_dir: str, crawl_name: str):

@@ -33,3 +33,20 @@ def extract_uuid(uuid_urn: str) -> str:
     # Extract the UUID from the URN
     # "<urn:uuid:6a8657b3-84d0-45df-b4b2-5fb6eef55ee5>" -> "6a8657b384d045dfb4b25fb6eef55ee5"
     return uuid_re.sub("\\1", uuid_urn).replace("-", "")
+
+
+def is_in_fineweb(crawl: str, language: str) -> bool:
+    _, dump_year, dump_issue = crawl.rsplit("-", 2)
+    dump_year = int(dump_year)
+    dump_issue = int(dump_issue)
+
+    if (dump_year > 2024 or (dump_year == 2024 and dump_issue > 18)) and not language.startswith("eng"):
+        # Is in FineWeb-2
+        return False
+
+    # FW1 v1.3 contains data up to 2024-51
+    if (dump_year > 2024 or (dump_year == 2024 and dump_issue > 51)) and language.startswith("eng"):
+        # Is in FineWeb
+        return False
+
+    return True

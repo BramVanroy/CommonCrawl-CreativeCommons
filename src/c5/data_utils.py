@@ -6,9 +6,11 @@ from typing import Generator
 
 import requests
 import yaml
+from huggingface_hub import list_repo_files, upload_file
 from huggingface_hub.file_download import hf_hub_download
-from huggingface_hub.hf_api import list_repo_files
 from tqdm import tqdm
+
+from c5.utils import is_in_fineweb
 
 
 def yield_repo_parquet_files(
@@ -56,45 +58,91 @@ def yield_repo_parquet_files(
 
         pf = Path(remote_parquet_uri)
         dump_name = pf.parents[1].stem
-        _, dump_year, dump_issue = dump_name.rsplit("-", 2)
-        dump_year = int(dump_year)
-        dump_issue = int(dump_issue)
         language = pf.parents[0].stem
 
         if skip_non_fineweb_dumps:
-            do_process = True
-            if (dump_year > 2024 or (dump_year == 2024 and dump_issue > 18)) and not language.startswith("eng"):
-                do_process = False
-                print(f"Skipping {pf} because it is not in English and the dump is after 2024-18")
-
-            # FW1 v1.3 contains data up to 2024-51
-            if (dump_year > 2024 or (dump_year == 2024 and dump_issue > 51)) and language.startswith("eng"):
-                do_process = False
-                print(f"Skipping {pf} because it is in English and the dump is after 2024-51")
-
+            do_process = is_in_fineweb(dump_name, language)
             if not do_process:
                 continue
 
         print(f"Processing {pf}")
+        yield from download_and_yield_with_retry(
+            dataset_name,
+            remote_filename=pf.name,
+            remote_subfolder=pf.parent,
+            local_dir=tmp_dir,
+        )
 
-        num_retries = 3
-        while num_retries:
-            try:
-                local_fname = hf_hub_download(
-                    dataset_name,
-                    filename=pf.name,
-                    subfolder=pf.parent,
-                    repo_type="dataset",
-                    local_dir=tmp_dir,
-                )
-            except Exception as exc:
-                num_retries -= 1
-                print(f"Error downloading {pf}: {exc}")
-                if not num_retries:
-                    raise exc
-            else:
-                yield remote_parquet_uri, local_fname
-                break
+
+def download_and_yield_with_retry(
+    repo_id: str,
+    remote_filename: str,
+    remote_subfolder: str | None = None,
+    local_dir: str | None = None,
+    num_retries: int = 3,
+):
+    while num_retries:
+        try:
+            local_fname = hf_hub_download(
+                repo_id,
+                filename=remote_filename,
+                subfolder=remote_subfolder,
+                repo_type="dataset",
+                local_dir=local_dir,
+            )
+        except Exception as exc:
+            num_retries -= 1
+            print(f"Error downloading {remote_filename}: {exc}")
+            if not num_retries:
+                raise exc
+        else:
+            remote_uri = f"{remote_subfolder}/{remote_filename}" if remote_subfolder else remote_filename
+            yield remote_uri, local_fname
+            break
+
+
+def upload_with_retry(
+    repo_id: str,
+    local_fname: str,
+    remote_parquet_uri: str,
+    num_retries: int = 3,
+    run_as_future: bool = False,
+):
+    result = None
+    while num_retries:
+        try:
+            result = upload_file(
+                path_or_fileobj=local_fname,
+                path_in_repo=remote_parquet_uri,
+                repo_type="dataset",
+                repo_id=repo_id,
+                commit_message="Filtered on high-quality",
+                run_as_future=run_as_future,
+            )
+        except Exception as exc:
+            num_retries -= 1
+            print(f"Error uploading {local_fname}: {exc}")
+            if not num_retries:
+                raise exc
+        else:
+            break
+
+    return result
+
+
+def upload_with_retry_async(
+    repo_id: str,
+    local_fname: str,
+    remote_parquet_uri: str,
+    num_retries: int = 3,
+):
+    return upload_with_retry(
+        repo_id=repo_id,
+        local_fname=local_fname,
+        remote_parquet_uri=remote_parquet_uri,
+        num_retries=num_retries,
+        run_as_future=True,
+    )
 
 
 def get_fw2_language_threshold(languages: list[str]) -> dict[str, float]:
