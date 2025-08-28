@@ -17,9 +17,9 @@ def is_fineweb(row: dict) -> bool:
     return row.get("found_in_fw", False) is True
 
 
-def is_recommended(row: dict) -> bool:
+def is_strict(row: dict) -> bool:
     """
-    Check if the document is recommended based on the 'found_in_fw' and 'license_abbr' fields.
+    Check if the document is strict based on the 'found_in_fw' and 'license_abbr' fields.
     """
     return (
         (not row["license_disagreement"])
@@ -31,7 +31,7 @@ def is_recommended(row: dict) -> bool:
 
 
 def main(
-    version: Literal["fine", "recommended"] = "fine",
+    version: Literal["fine", "strict"] = "fine",
     skip_dumps: list[str] = None,
     only_dumps: list[str] = None,
     num_proc: int | None = None,
@@ -45,8 +45,8 @@ def main(
         only_dumps (list[str]): List of dumps to process.
         num_proc (int | None): Number of processes to use for multiprocessing.
     """
-    if version not in ["fine", "recommended"]:
-        raise ValueError(f"Invalid version: {version}. Must be 'fine' or 'recommended'.")
+    if version not in ["fine", "strict"]:
+        raise ValueError(f"Invalid version: {version}. Must be 'fine' or 'strict'.")
 
     tmp_dir = Path(__file__).parents[2] / "tmp" / "create_fine"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -58,7 +58,7 @@ def main(
     if version == "fine":
         filter_dataset_name = "BramVanroy/CommonCrawl-CreativeCommons-fine"
     else:
-        filter_dataset_name = "BramVanroy/CommonCrawl-CreativeCommons-recommended"
+        filter_dataset_name = "BramVanroy/CommonCrawl-CreativeCommons-strict"
 
     create_repo(
         repo_id=filter_dataset_name,
@@ -91,7 +91,7 @@ def main(
             ds = Dataset.from_parquet(local_fname, features=features)
 
             ds = ds.filter(
-                is_fineweb if version == "fine" else is_recommended,
+                is_fineweb if version == "fine" else is_strict,
                 desc="Filtering",
                 num_proc=num_proc,
             ).remove_columns("found_in_fw")
@@ -126,9 +126,9 @@ if __name__ == "__main__":
     )
     cparser.add_argument(
         "--version",
-        choices=["fine", "recommended"],
+        choices=["fine", "strict"],
         default="fine",
-        help="Version of the dataset to create: 'fine' or 'recommended'.",
+        help="Version of the dataset to create: 'fine' or 'strict'.",
     )
     cparser.add_argument(
         "--skip-dumps",
