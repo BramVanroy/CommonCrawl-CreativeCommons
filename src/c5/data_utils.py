@@ -1,4 +1,5 @@
 import gzip
+import io
 import json
 import time
 from pathlib import Path
@@ -243,3 +244,35 @@ def yield_jsonl_gz_data_robust(pfiles: list[Path], disable_tqdm: bool = False):
                 if num_failures:
                     print(f"Skipped {num_failures:,} corrupt line(s) in {pfin}")
             pbar.update(1)
+
+
+def download_warc_urls_file(dump: str, output_folder: str, limit: int = None, overwrite: bool = False) -> str:
+    pdout = Path(output_folder)
+    pdout.mkdir(parents=True, exist_ok=True)
+    pfout = pdout / f"{dump}_warc_urls.txt"
+
+    if (pfout.exists() and pfout.stat().st_size > 0) and not overwrite:
+        print(f"File {pfout} already exists. Skipping download.")
+        return str(pfout)
+    elif pfout.exists() and overwrite:
+        print(f"File {pfout} already exists. Overwriting.")
+        pfout.unlink()
+
+    # A file with one path per line, e.g.
+    paths_url = f"https://data.commoncrawl.org/crawl-data/{dump}/warc.paths.gz"
+
+    r = requests.get(paths_url, timeout=120)
+    r.raise_for_status()
+
+    lines = gzip.GzipFile(fileobj=io.BytesIO(r.content)).read().decode("utf-8").splitlines()
+
+    # Keep only WARC files (you can also sample/limit here)
+    warc_urls = [p for p in lines if p.endswith(".warc.gz")]
+
+    if limit is not None:
+        warc_urls = warc_urls[:limit]
+
+    with pfout.open("w", encoding="utf-8") as fhout:
+        fhout.write("\n".join(warc_urls) + "\n")
+
+    return str(pfout)

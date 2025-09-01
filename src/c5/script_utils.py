@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from c5.components.annotators import FWSingleDBContainmentAnnotator, LicenseAnnotator
 from c5.components.filters import CCTextFilter, LanguageFilterWithIgnore, LicenseFilter
 from c5.components.readers.robust_jsonl import RobustJsonlReader
-from c5.data_utils import get_fw2_language_threshold
+from c5.data_utils import download_warc_urls_file, get_fw2_language_threshold
 
 
 LANGUAGES_V1 = [
@@ -151,13 +151,14 @@ def build_main_pipeline(
                 raise ValueError(
                     f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data."
                 )
+    # A file with one path per line, e.g. crawl-data/CC-MAIN-2025-33/segments/1754151279521.11/warc/CC-MAIN-20250802220907-20250803010907-00003.warc.gz
+    warc_url_file = download_warc_urls_file(dump, output_folder, limit=limit, overwrite=False)
 
     return [
         WarcReader(
-            f"https://data.commoncrawl.org/crawl-data/{dump}/segments/",
-            glob_pattern="*/warc/*",
+            "https://data.commoncrawl.org",
+            paths_file=warc_url_file,
             default_metadata={"dump": dump},
-            limit=limit,
         ),
         URLFilter(extra_domains=extra_domains),
         CCTextFilter(),  # filter items without creativecommons.org in text (text-attr = read HTML at this point) -- cheap
