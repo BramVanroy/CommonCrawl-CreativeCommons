@@ -154,7 +154,7 @@ def build_main_pipeline(
 
     return [
         WarcReader(
-            f"s3://commoncrawl/crawl-data/{dump}/segments/",
+            f"https://data.commoncrawl.org/crawl-data/{dump}/segments/",
             glob_pattern="*/warc/*",
             default_metadata={"dump": dump},
             limit=limit,
