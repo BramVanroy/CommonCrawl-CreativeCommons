@@ -121,6 +121,7 @@ def build_main_pipeline(
     limit: int = -1,
     extra_domains: list[str] | None = None,
     ignore_undetermined: bool = True,
+    use_s3: bool = True,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -133,6 +134,9 @@ def build_main_pipeline(
         limit (int, optional): Maximum number of pages to process per task, useful for debugging.
         -1 = no limit. Defaults to -1.
         extra_domains (list[str], optional): List of extra domains to filter for. Defaults to None.
+        ignore_undetermined (bool, optional): Whether to ignore undetermined and non-linguistic
+        languages. Defaults to True.
+        use_s3 (bool, optional): Whether to use the S3 endpoint (True) or the HTTPS endpoint (False).
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
@@ -152,15 +156,26 @@ def build_main_pipeline(
                 raise ValueError(
                     f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data."
                 )
-    # A file with one path per line, e.g. crawl-data/CC-MAIN-2025-33/segments/1754151279521.11/warc/CC-MAIN-20250802220907-20250803010907-00003.warc.gz
-    warc_url_file = download_warc_urls_file(dump, output_folder, limit=limit, overwrite=False)
-
-    return [
-        RetryWarcReader(
+    if use_s3:
+        # Use the S3 bucket
+        reader = RetryWarcReader(
+            f"s3://commoncrawl/crawl-data/{dump}/segments/",
+            glob_pattern="*/warc/*",
+            default_metadata={"dump": dump},
+            limit=limit,
+        )
+    else:
+        # Use the HTTPS endpoint (over Cloudfront)
+        # A file with one path per line, e.g. crawl-data/CC-MAIN-2025-33/segments/1754151279521.11/warc/CC-MAIN-20250802220907-20250803010907-00003.warc.gz
+        warc_url_file = download_warc_urls_file(dump, output_folder, limit=limit, overwrite=False)
+        reader = RetryWarcReader(
             "https://data.commoncrawl.org",
             paths_file=warc_url_file,
             default_metadata={"dump": dump},
-        ),
+        )
+
+    return [
+        reader,
         URLFilter(extra_domains=extra_domains),
         CCTextFilter(),  # filter items without creativecommons.org in text (text-attr = read HTML at this point) -- cheap
         LicenseAnnotator(),
