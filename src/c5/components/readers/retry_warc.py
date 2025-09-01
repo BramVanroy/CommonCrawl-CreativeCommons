@@ -95,17 +95,17 @@ class RetryWarcReader(WarcReader):
                                 continue
                         yield document
                         last_emitted_index = ri
+                        num_retries = self.max_num_retries
 
             except Exception as exc:
                 num_retries -= 1
                 logger.warning(f"Error reading {filepath} at record {last_emitted_index + 1}: {exc}")
 
                 if not num_retries:
-                    logger.error(f"Max retries reached for {filepath}. Skipping the rest of the file.")
+                    logger.error(f"Max retries reached for {filepath}...")
                     raise exc
                 else:
-                    wait_time = min(self.base_timeout_s * (2 ** (self.max_num_retries - num_retries)), self.max_wait_s)
-                    logger.info(f"Retrying {filepath} in {wait_time} seconds... ({num_retries} retries left)")
+                    logger.info(f"Retrying {filepath} in 2 seconds... ({num_retries} retries left)")
                     # Common Crawl says to wait at least 1 second between requests: https://status.commoncrawl.org/
                     time.sleep(2)
             else:
