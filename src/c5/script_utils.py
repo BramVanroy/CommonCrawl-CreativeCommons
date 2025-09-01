@@ -8,13 +8,14 @@ from datatrove.pipeline.base import PipelineStep
 from datatrove.pipeline.extractors import Trafilatura
 from datatrove.pipeline.filters import URLFilter
 from datatrove.pipeline.formatters import FTFYFormatter, PIIFormatter, SymbolLinesFormatter
-from datatrove.pipeline.readers import JsonlReader, WarcReader
+from datatrove.pipeline.readers import JsonlReader
 from datatrove.pipeline.writers import HuggingFaceDatasetWriter, JsonlWriter
 from huggingface_hub import hf_hub_download, list_repo_files
 from pydantic import BaseModel
 
 from c5.components.annotators import FWSingleDBContainmentAnnotator, LicenseAnnotator
 from c5.components.filters import CCTextFilter, LanguageFilterWithIgnore, LicenseFilter
+from c5.components.readers.retry_warc import RetryWarcReader
 from c5.components.readers.robust_jsonl import RobustJsonlReader
 from c5.data_utils import download_warc_urls_file, get_fw2_language_threshold
 
@@ -155,7 +156,7 @@ def build_main_pipeline(
     warc_url_file = download_warc_urls_file(dump, output_folder, limit=limit, overwrite=False)
 
     return [
-        WarcReader(
+        RetryWarcReader(
             "https://data.commoncrawl.org",
             paths_file=warc_url_file,
             default_metadata={"dump": dump},
