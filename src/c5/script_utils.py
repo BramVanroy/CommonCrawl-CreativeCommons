@@ -181,7 +181,7 @@ def build_main_pipeline(
         CCTextFilter(),  # filter items without creativecommons.org in text (text-attr = read HTML at this point) -- cheap
         LicenseAnnotator(),
         LicenseFilter(),
-        Trafilatura(favour_precision=True, timeout=120.0, deduplicate=True),
+        Trafilatura(favour_precision=True, timeout=60.0, deduplicate=True),
         LanguageFilterWithIgnore(
             languages=languages, ignore_language_prefixes=ignore_languages, language_threshold=lang_thresholds
         ),
