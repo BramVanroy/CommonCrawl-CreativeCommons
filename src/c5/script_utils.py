@@ -91,6 +91,7 @@ class BaseConfig(BaseModel):
     overwrite_with_none: bool = False
     ignore_duckdb_for: list[str] | None = None
     limit: int = -1
+    use_s3: bool = True
 
     def model_post_init(self, __context):
         if not self.languages:

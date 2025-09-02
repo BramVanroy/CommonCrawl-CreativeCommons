@@ -37,6 +37,7 @@ def main(
         ignore_undetermined=cfg.ignore_undetermined,
         limit=cfg.limit,
         extra_domains=get_fw_c_and_d_domains(),
+        use_s3=cfg.use_s3,
     )
     main_executor = LocalPipelineExecutor(
         pipeline=main_pipeline,
