@@ -91,7 +91,7 @@ class BaseConfig(BaseModel):
     overwrite_with_none: bool = False
     ignore_duckdb_for: list[str] | None = None
     limit: int = -1
-    use_s3: bool = True
+    use_s3: bool = False
 
     def model_post_init(self, __context):
         if not self.languages:
@@ -122,7 +122,7 @@ def build_main_pipeline(
     limit: int = -1,
     extra_domains: list[str] | None = None,
     ignore_undetermined: bool = True,
-    use_s3: bool = True,
+    use_s3: bool = False,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
