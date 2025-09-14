@@ -52,6 +52,8 @@ class RetryWarcReader(WarcReader):
         glob_pattern: str | None = None,
         shuffle_files: bool = False,
         max_num_retries: int = 1000,
+        # Common Crawl says to wait at least 1 second between requests: https://status.commoncrawl.org/
+        timeout_s: int = 1,
     ):
         super().__init__(
             data_folder,
@@ -70,6 +72,7 @@ class RetryWarcReader(WarcReader):
             shuffle_files,
         )
         self.max_num_retries = max_num_retries
+        self.timeout_s = timeout_s
 
     def read_file(self, filepath: str):
         from warcio.archiveiterator import ArchiveIterator
@@ -101,13 +104,13 @@ class RetryWarcReader(WarcReader):
                 num_retries -= 1
                 logger.warning(f"Error reading {filepath} at record {last_emitted_index + 1}: {exc}")
 
-                if not num_retries:
+                if num_retries <= 0:
                     logger.error(f"Max retries reached for {filepath}...")
                     raise exc
                 else:
-                    logger.info(f"Retrying {filepath} in 2 seconds... ({num_retries} retries left)")
-                    # Common Crawl says to wait at least 1 second between requests: https://status.commoncrawl.org/
-                    time.sleep(2)
+                    logger.info(f"Retrying {filepath} in {self.timeout_s} seconds... ({num_retries} retries left)")
+                    time.sleep(self.timeout_s)
             else:
                 break
-        logger.info(f"Finished reading {filepath}")
+
+        logger.info(f"Finished reading {filepath}!")
