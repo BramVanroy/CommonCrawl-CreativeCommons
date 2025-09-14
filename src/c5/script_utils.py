@@ -15,9 +15,9 @@ from pydantic import BaseModel
 
 from c5.components.annotators import FWSingleDBContainmentAnnotator, LicenseAnnotator
 from c5.components.filters import CCTextFilter, LanguageFilterWithIgnore, LicenseFilter
-from c5.components.readers.retry_warc import RetryWarcReader
-from c5.components.readers.robust_jsonl import RobustJsonlReader
+from c5.components.readers import RetryWarcReader, RobustJsonlReader
 from c5.data_utils import download_warc_urls_file, get_fw2_language_threshold
+from c5.version import version as c5_version
 
 
 LANGUAGES_V1 = [
@@ -92,6 +92,7 @@ class BaseConfig(BaseModel):
     ignore_duckdb_for: list[str] | None = None
     limit: int = -1
     use_s3: bool = False
+    download_block_size_bytes: int = 64 * 1024 * 1024  # 64MB
 
     def model_post_init(self, __context):
         if not self.languages:
@@ -123,6 +124,7 @@ def build_main_pipeline(
     extra_domains: list[str] | None = None,
     ignore_undetermined: bool = True,
     use_s3: bool = False,
+    download_block_size_bytes: int = 64 * 1024 * 1024,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -136,8 +138,10 @@ def build_main_pipeline(
         -1 = no limit. Defaults to -1.
         extra_domains (list[str], optional): List of extra domains to filter for. Defaults to None.
         ignore_undetermined (bool, optional): Whether to ignore undetermined and non-linguistic
-        languages. Defaults to True.
+        languages.
         use_s3 (bool, optional): Whether to use the S3 endpoint (True) or the HTTPS endpoint (False).
+        download_block_size_bytes (int, optional): Block size to use when downloading files from
+        Common Crawl. Larger block sizes will use more memory but will be faster.
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
@@ -157,22 +161,37 @@ def build_main_pipeline(
                 raise ValueError(
                     f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data."
                 )
+
+    # Optional: set a *default* block size on the filesystem (you
     if use_s3:
         # Use the S3 bucket
+        # options not optimized
+        fs_options = {}
         reader = RetryWarcReader(
-            f"s3://commoncrawl/crawl-data/{dump}/segments/",
+            (f"s3://commoncrawl/crawl-data/{dump}/segments/", fs_options),
             glob_pattern="*/warc/*",
             default_metadata={"dump": dump},
             limit=limit,
         )
     else:
+        fs_options = {
+            "headers": {
+                "User-Agent": f"C5 (v{c5_version}) (contact: bram.vanroy@ivdnt.org)",
+                "Accept-Encoding": "identity",
+            },
+            "client_kwargs": {
+                "trust_env": True,
+            },
+            "block_size": download_block_size_bytes,
+        }
         # Use the HTTPS endpoint (over Cloudfront)
         # A file with one path per line, e.g. crawl-data/CC-MAIN-2025-33/segments/1754151279521.11/warc/CC-MAIN-20250802220907-20250803010907-00003.warc.gz
-        warc_url_file = download_warc_urls_file(dump, output_folder, limit=limit, overwrite=False)
+        warc_url_file = download_warc_urls_file(dump, output_folder, overwrite=False)
         reader = RetryWarcReader(
-            "https://data.commoncrawl.org",
+            ("https://data.commoncrawl.org", fs_options),
             paths_file=warc_url_file,
             default_metadata={"dump": dump},
+            limit=limit,
         )
 
     return [
