@@ -2,6 +2,7 @@ import gzip
 import io
 import json
 import time
+from os import PathLike
 from pathlib import Path
 from typing import Generator
 
@@ -82,6 +83,17 @@ def download_and_yield_with_retry(
     local_dir: str | None = None,
     num_retries: int = 3,
 ):
+    """
+    Download a file from the given HF repo, retrying up to num_retries times in case of failure.
+    After downloading the file, yield a tuple of (remote_filename, local_filename).
+
+    Args:
+        repo_id (str): The ID of the repo to download from.
+        remote_filename (str): The name of the file to download.
+        remote_subfolder (str | None): The subfolder in the repo where the file is located.
+        local_dir (str | None): The directory to download the file to. If None, a temporary directory is created.
+        num_retries (int): The number of times to retry the download in case of failure.
+    """
     while num_retries:
         try:
             local_fname = hf_hub_download(
@@ -107,8 +119,20 @@ def upload_with_retry(
     local_fname: str,
     remote_parquet_uri: str,
     num_retries: int = 3,
+    commit_message: str | None = None,
     run_as_future: bool = False,
 ):
+    """
+    Upload a file to the given HF repo, retrying up to num_retries times in case of failure.
+
+    Args:
+        repo_id (str): The ID of the repo to upload to.
+        local_fname (str): The path to the local file to upload.
+        remote_parquet_uri (str): The path in the repo to upload the file to.
+        num_retries (int): The number of times to retry the upload in case of failure.
+        commit_message (str | None): An optional description for the commit message.
+        run_as_future (bool): Whether to run the upload as a future (non-blocking).
+    """
     result = None
     while num_retries:
         try:
@@ -117,7 +141,7 @@ def upload_with_retry(
                 path_in_repo=remote_parquet_uri,
                 repo_type="dataset",
                 repo_id=repo_id,
-                commit_message="Filtered on high-quality",
+                commit_message=commit_message,
                 run_as_future=run_as_future,
             )
         except Exception as exc:
@@ -129,21 +153,6 @@ def upload_with_retry(
             break
 
     return result
-
-
-def upload_with_retry_async(
-    repo_id: str,
-    local_fname: str,
-    remote_parquet_uri: str,
-    num_retries: int = 3,
-):
-    return upload_with_retry(
-        repo_id=repo_id,
-        local_fname=local_fname,
-        remote_parquet_uri=remote_parquet_uri,
-        num_retries=num_retries,
-        run_as_future=True,
-    )
 
 
 def get_fw2_language_threshold(languages: list[str]) -> dict[str, float]:
@@ -213,14 +222,16 @@ def download_fw2_language_configs(languages: list[str]) -> str:
     return str(pdout)
 
 
-def yield_jsonl_gz_data_robust(pfiles: list[Path], disable_tqdm: bool = False):
+def yield_jsonl_gz_data_robust(pfiles: list[PathLike], disable_tqdm: bool = False):
     """
     Given a set of .jsonl.gz files, this function reads them in a robust way, skipping incomplete lines,
     and yielding one sample at a time (parse-able JSON line).
 
-    :param pfiles: A list of .jsonl.gz files
-    :return: A generator yielding the contents of the files
+    Args:
+        pfiles (list[Path]): List of paths to .jsonl.gz files.
+        disable_tqdm (bool): Whether to disable the tqdm progress bar.
     """
+    pfiles = [Path(pf) for pf in pfiles]
     with tqdm(total=len(pfiles), desc="Reading", unit="file", disable=disable_tqdm) as pbar:
         for pfin in pfiles:
             if pfin.stat().st_size == 0:
@@ -246,7 +257,16 @@ def yield_jsonl_gz_data_robust(pfiles: list[Path], disable_tqdm: bool = False):
             pbar.update(1)
 
 
-def download_warc_urls_file(dump: str, output_folder: str, limit: int = None, overwrite: bool = False) -> str:
+def download_warc_urls_file(dump: str, output_folder: str, overwrite: bool = False) -> str:
+    """
+    Download the WARC URLs file for the given dump from Common Crawl. It contains
+    the list of all WARC files available for that dump.
+
+    Args:
+        dump (str): The dump name, e.g. CC-MAIN-2024-18
+        output_folder (str): The folder to save the WARC URLs file to, will be saved as {dump}_warc_urls.txt
+        overwrite (bool): Whether to overwrite the file if it already exists.
+    """
     pdout = Path(output_folder)
     pdout.mkdir(parents=True, exist_ok=True)
     pfout = pdout / f"{dump}_warc_urls.txt"
@@ -265,12 +285,7 @@ def download_warc_urls_file(dump: str, output_folder: str, limit: int = None, ov
     r.raise_for_status()
 
     lines = gzip.GzipFile(fileobj=io.BytesIO(r.content)).read().decode("utf-8").splitlines()
-
-    # Keep only WARC files (you can also sample/limit here)
-    warc_urls = [p for p in lines if p.endswith(".warc.gz")]
-
-    if limit is not None:
-        warc_urls = warc_urls[:limit]
+    warc_urls = [p.strip() for p in lines if p.strip()]
 
     with pfout.open("w", encoding="utf-8") as fhout:
         fhout.write("\n".join(warc_urls) + "\n")
