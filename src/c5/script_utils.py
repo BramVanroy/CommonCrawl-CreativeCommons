@@ -141,7 +141,9 @@ def build_main_pipeline(
         languages.
         use_s3 (bool, optional): Whether to use the S3 endpoint (True) or the HTTPS endpoint (False).
         download_block_size_bytes (int, optional): Block size to use when downloading files from
-        Common Crawl. Larger block sizes will use more memory but will be faster.
+        Common Crawl. Larger block sizes will use more memoryq but will be faster. If `0`, uses streaming
+        which only sends a single request so might be better suited for highly parallel (slurm) processing
+        to avoid request rate limiting.
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
