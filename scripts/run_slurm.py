@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import yaml
-from datatrove.executor.slurm import SlurmPipelineExecutor
 
+from c5.components.slurm_executor import C5SlurmExecutor
 from c5.script_utils import (
     SlurmConfig,
     build_containment_pipeline,
@@ -28,7 +28,7 @@ def main(
     cfg = SlurmConfig(**config)
 
     fw_duckdb_path = cfg.fw_duckdb_templ_path.format(dump=dump)
-    ignore_duckdb_for, ignore_all_duckdb = download_duckdbs(dump, fw_duckdb_path, cfg)
+    ignore_duckdb_for, _ = download_duckdbs(dump, fw_duckdb_path, cfg)
 
     main_output_path = output_path.rstrip("/") + "-main/"
     main_dump_output_path = main_output_path + dump + "/"
@@ -42,7 +42,7 @@ def main(
         use_s3=cfg.use_s3,
         download_block_size_bytes=cfg.download_block_size_bytes,
     )
-    main_executor = SlurmPipelineExecutor(
+    main_executor = C5SlurmExecutor(
         pipeline=main_pipeline,
         job_id_retriever=job_id_retriever,
         tasks=cfg.main_tasks,
@@ -80,7 +80,7 @@ def main(
             overwrite_with_none=ignore_duckdb,
             output_folder=containment_dump_output_path,
         )
-        containment_executor = SlurmPipelineExecutor(
+        containment_executor = C5SlurmExecutor(
             pipeline=containment_pipeline,
             job_id_retriever=job_id_retriever,
             tasks=cfg.containment_tasks,

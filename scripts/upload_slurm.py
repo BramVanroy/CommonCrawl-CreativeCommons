@@ -1,8 +1,8 @@
 from pathlib import Path
 
 import yaml
-from datatrove.executor.slurm import SlurmPipelineExecutor
 
+from c5.components.slurm_executor import C5SlurmExecutor
 from c5.script_utils import SlurmUploadConfig, build_upload_pipeline, job_id_retriever
 from c5.utils import PROJECT_ROOT, print_system_stats
 
@@ -33,7 +33,7 @@ def main(
     )
     log_dir = str(PROJECT_ROOT / "logs" / "upload-logs" / crawl_name)
     slurm_log_dir = str(PROJECT_ROOT / "slurm-logs" / "upload-logs" / crawl_name)
-    SlurmPipelineExecutor(
+    C5SlurmExecutor(
         pipeline=pipeline,
         job_id_retriever=job_id_retriever,
         tasks=cfg.tasks,

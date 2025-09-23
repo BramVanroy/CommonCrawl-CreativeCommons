@@ -71,7 +71,7 @@ class SlurmUploadConfig(BaseUploadConfig):
     """Slurm configuration for running the pipeline on a cluster"""
 
     time: str
-    mem_per_cpu_gb: int = 2
+    mem_per_cpu_gb: int | None = None
     cpus_per_task: int = 1
 
 
@@ -108,8 +108,8 @@ class SlurmConfig(BaseConfig):
 
     main_time: str = "3-00:00:00"
     containment_time: str = "1-00:00:00"
-    main_mem_per_cpu_gb: int = 4
-    containment_mem_per_cpu_gb: int = 4
+    main_mem_per_cpu_gb: int | None = None
+    containment_mem_per_cpu_gb: int | None = None
     main_cpus_per_task: int = 1
     containment_cpus_per_task: int = 16
     max_array_launch_parallel: bool = False
@@ -141,7 +141,7 @@ def build_main_pipeline(
         languages.
         use_s3 (bool, optional): Whether to use the S3 endpoint (True) or the HTTPS endpoint (False).
         download_block_size_bytes (int, optional): Block size to use when downloading files from
-        Common Crawl. Larger block sizes will use more memoryq but will be faster. If `0`, uses streaming
+        Common Crawl. Larger block sizes will use more memory but will be faster. If `0`, uses streaming
         which only sends a single request so might be better suited for highly parallel (slurm) processing
         to avoid request rate limiting.
 
