@@ -53,7 +53,7 @@ class RetryWarcReader(WarcReader):
         shuffle_files: bool = False,
         max_num_retries: int = 1000,
         # Common Crawl says to wait at least 1 second between requests: https://status.commoncrawl.org/
-        timeout_s: int = 1,
+        timeout_s: int = 5,
     ):
         super().__init__(
             data_folder,
