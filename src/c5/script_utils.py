@@ -112,6 +112,7 @@ class SlurmConfig(BaseConfig):
     containment_mem_per_cpu_gb: int | None = None
     main_cpus_per_task: int = 1
     containment_cpus_per_task: int = 16
+    max_array_size: int = 10001
     max_array_launch_parallel: bool = False
     stagger_max_array_jobs: int = 900
 
