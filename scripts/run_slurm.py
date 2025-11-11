@@ -58,9 +58,9 @@ def main(
         qos="",
         sbatch_args=sbatch_args,
         job_name="process-main",
-        max_array_launch_parallel=cfg.max_array_launch_parallel,
-        stagger_max_array_jobs=cfg.stagger_max_array_jobs,
-        max_array_size=cfg.max_array_size,
+        max_array_launch_parallel=cfg.main_max_array_launch_parallel,
+        stagger_max_array_jobs=cfg.main_stagger_max_array_jobs,
+        max_array_size=cfg.main_max_array_size,
     )
 
     # Do containment checking (separately because it's intensive on storage)
