@@ -102,7 +102,7 @@ class RetryWarcReader(WarcReader):
 
             except Exception as exc:
                 num_retries -= 1
-                logger.warning(f"Error reading {filepath} at record {last_emitted_index + 1}: {exc}")
+                logger.warning(f"Error reading {filepath} at record {last_emitted_index + 1}:\n[{type(exc)}]: {exc}")
 
                 if num_retries <= 0:
                     logger.error(f"Max retries reached for {filepath}...")
