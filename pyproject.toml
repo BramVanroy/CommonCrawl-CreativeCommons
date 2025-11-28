@@ -43,6 +43,8 @@ dependencies = [
     "tldextract>5.0,<6.0",
     "typing_extensions",
     "transformers>=4.55.2,<5",
+    # required by datatrove but versions >=0.22 have trouble installing
+    "kiwipiepy>=0.21,<=0.22",
 ]
 
 [project.optional-dependencies]
