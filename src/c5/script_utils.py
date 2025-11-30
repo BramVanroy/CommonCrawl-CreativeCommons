@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 from typing import Literal
 
+from aiohttp import ClientTimeout
+import fsspec
 import pyarrow as pa
 from datasets import load_dataset
 from datatrove.pipeline.base import PipelineStep
@@ -19,6 +21,8 @@ from c5.components.readers import RetryWarcReader, RobustJsonlReader
 from c5.data_utils import download_warc_urls_file, get_fw2_language_threshold
 from c5.version import version as c5_version
 
+if ver_match := re.match(r"^\d+\.\d+\.\d+", c5_version):
+    c5_version = ver_match.group(0)
 
 LANGUAGES_V1 = [
     "afr_Latn",
@@ -93,6 +97,9 @@ class BaseConfig(BaseModel):
     limit: int = -1
     use_s3: bool = False
     download_block_size_bytes: int = 64 * 1024 * 1024  # 64MB
+    max_num_retries: int = 100
+    timeout_s: int = 1
+    contact_email: str | None = None
 
     def model_post_init(self, __context):
         if not self.languages:
@@ -126,6 +133,9 @@ def build_main_pipeline(
     ignore_undetermined: bool = True,
     use_s3: bool = False,
     download_block_size_bytes: int = 64 * 1024 * 1024,
+    max_num_retries: int = 100,
+    timeout_s: int = 1,
+    contact_email: str | None = None,
 ) -> list[PipelineStep]:
     """Build a pipeline for extracting and filtering web pages from Common Crawl. This is a separate
     function so that it can be used in both the local and Slurm scripts.
@@ -144,7 +154,12 @@ def build_main_pipeline(
         download_block_size_bytes (int, optional): Block size to use when downloading files from
         Common Crawl. Larger block sizes will use more memory but will be faster. If `0`, uses streaming
         which only sends a single request so might be better suited for highly parallel (slurm) processing
-        to avoid request rate limiting.
+        to avoid request rate limiting. Only implemented for HTTP, not S3.
+        max_num_retries (int, optional): Maximum number of retries when downloading a WARC file. Defaults to 100.
+        timeout_s (int, optional): Timeout in seconds between retries when downloading
+        a WARC file. Defaults to 1.
+        contact_email (str | None, optional): Contact email to include in the User-Agent header.
+        Defaults to None. Only implemented for HTTP, not S3.
 
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
@@ -165,36 +180,37 @@ def build_main_pipeline(
                     f"Language {lang} not found in the language thresholds. Something must have gone wrong when loading the data."
                 )
 
-    # Optional: set a *default* block size on the filesystem (you
     if use_s3:
         # Use the S3 bucket
-        # options not optimized
         fs_options = {}
         reader = RetryWarcReader(
             (f"s3://commoncrawl/crawl-data/{dump}/segments/", fs_options),
             glob_pattern="*/warc/*",
             default_metadata={"dump": dump},
             limit=limit,
+            max_num_retries=max_num_retries,
+            timeout_s=timeout_s,
         )
     else:
-        fs_options = {
-            "headers": {
-                "User-Agent": f"C5 (v{c5_version}) (contact: bram.vanroy@ivdnt.org)",
+        fs = fsspec.filesystem(
+            "http",
+            headers={
+                "User-Agent": f"C5 (v{c5_version}) (contact: {contact_email if contact_email else 'unspecified'})",
                 "Accept-Encoding": "identity",
             },
-            "client_kwargs": {
-                "trust_env": True,
-            },
-            "block_size": download_block_size_bytes,
-        }
+            block_size=download_block_size_bytes,
+            cache_type="readahead",
+        )
         # Use the HTTPS endpoint (over Cloudfront)
         # A file with one path per line, e.g. crawl-data/CC-MAIN-2025-33/segments/1754151279521.11/warc/CC-MAIN-20250802220907-20250803010907-00003.warc.gz
         warc_url_file = download_warc_urls_file(dump, output_folder, overwrite=False)
         reader = RetryWarcReader(
-            ("https://data.commoncrawl.org", fs_options),
+            ("https://data.commoncrawl.org", fs),
             paths_file=warc_url_file,
             default_metadata={"dump": dump},
             limit=limit,
+            max_num_retries=max_num_retries,
+            timeout_s=timeout_s,
         )
 
     return [

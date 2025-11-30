@@ -41,6 +41,9 @@ def main(
         extra_domains=get_fw_c_and_d_domains(),
         use_s3=cfg.use_s3,
         download_block_size_bytes=cfg.download_block_size_bytes,
+        max_num_retries=cfg.max_num_retries,
+        timeout_s=cfg.timeout_s,
+        contact_email=cfg.contact_email,
     )
     main_executor = C5SlurmExecutor(
         pipeline=main_pipeline,
