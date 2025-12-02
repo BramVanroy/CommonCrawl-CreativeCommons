@@ -9,7 +9,7 @@ class LanguageFilterWithIgnore(LanguageFilter):
     def __init__(
         self,
         languages: list[str] | str | None = None,
-        ignore_language_prefixes: list[str] | str | None = None,
+        ignore_undetermined: bool = True,
         language_threshold: float | dict = 0.65,
         exclusion_writer: DiskWriter = None,
         label_only: bool = False,
@@ -19,14 +19,9 @@ class LanguageFilterWithIgnore(LanguageFilter):
         filters if the predicted language is not among given language or if the language score is below language
         language_threshold
 
-        ADDED: `ignore_language_prefixes`. If a language is in this list,
-        the document is removed regardless of the language score. Here the language does NOT include the script, e.g.
-        `eng` instead of `eng_Latn`. This allows to ignore `und`, for undertermined languages.
-
         Args:
             languages: list of languages to keep. None for all
-            ignore_language_prefixes: list of languages to ignore. If the language is in this list, the document is removed
-                regardless of the language score.
+            ignore_undetermined: if True, ignore undetermined and non-linguistic languages (`und_` and `zxx_`)
             language_threshold: language_threshold minimum score to accept a document. Can be a float or a dict with
                 language as key and threshold as value.
             exclusion_writer:
@@ -41,11 +36,8 @@ class LanguageFilterWithIgnore(LanguageFilter):
             label_only=label_only,
             keep_top_pairs_threshold=-1,
         )
-        if isinstance(ignore_language_prefixes, str):
-            ignore_language_prefixes = [ignore_language_prefixes]
-        elif ignore_language_prefixes is None:
-            ignore_language_prefixes = []
-        self.ignore_language_prefix = set(ignore_language_prefixes)
+        self.ignore_undetermined = ignore_undetermined
+        self.undetermined_langs = ("und", "zxx")
 
         if self.languages is not None:
             self.languages = set(self.languages)
@@ -59,7 +51,7 @@ class LanguageFilterWithIgnore(LanguageFilter):
 
         print("LANGUAGE FILTER")
         print("LANGUAGES", self.languages)
-        print("IGNORE LANGUAGES", self.ignore_language_prefix)
+        print("IGNORE UND/ZXX", self.ignore_undetermined)
         print("LANGUAGE THRESHOLD", self.language_threshold)
         print("LABEL ONLY", self.label_only)
 
@@ -93,11 +85,8 @@ class LanguageFilterWithIgnore(LanguageFilter):
 
         lang, script = lang.split("_")
 
-        if not self.label_only:
-            # Loop so we can provide the language that was ignored in reasoning
-            for ignore_lang in self.ignore_language_prefix:
-                if lang == ignore_lang:
-                    return False, f"{lang}_in_ignore_list"
+        if not self.label_only and self.ignore_undetermined and lang in self.undetermined_langs:
+            return False, "undetermined_or_non_linguistic_language"
 
         doc.metadata["language_script"] = script
         doc.metadata["language"] = lang

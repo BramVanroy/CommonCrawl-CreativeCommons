@@ -2,7 +2,6 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from aiohttp import ClientTimeout
 import fsspec
 import pyarrow as pa
 from datasets import load_dataset
@@ -149,7 +148,7 @@ def build_main_pipeline(
         -1 = no limit. Defaults to -1.
         extra_domains (list[str], optional): List of extra domains to filter for. Defaults to None.
         ignore_undetermined (bool, optional): Whether to ignore undetermined and non-linguistic
-        languages.
+        languages. See `und_` and `zxx_` in https://github.com/cisnlp/GlotLID/blob/main/languages-v3.md
         use_s3 (bool, optional): Whether to use the S3 endpoint (True) or the HTTPS endpoint (False).
         download_block_size_bytes (int, optional): Block size to use when downloading files from
         Common Crawl. Larger block sizes will use more memory but will be faster. If `0`, uses streaming
@@ -164,8 +163,6 @@ def build_main_pipeline(
     Returns:
         list[PipelineStep]: List of pipeline steps (i.e., the pipeline components)
     """
-    # Do not include any of GlotLID's nonlinguistic and undetermined languages: https://github.com/cisnlp/GlotLID/blob/main/languages-v3.md
-    ignore_languages = ["und", "zxx"] if ignore_undetermined else []
     fw2_languages = [l for l in languages if l != "eng_Latn"]
     lang_thresholds = get_fw2_language_threshold(fw2_languages)
 
@@ -221,7 +218,7 @@ def build_main_pipeline(
         LicenseFilter(),
         Trafilatura(favour_precision=True, timeout=60.0, deduplicate=True),
         LanguageFilterWithIgnore(
-            languages=languages, ignore_language_prefixes=ignore_languages, language_threshold=lang_thresholds
+            languages=languages, ignore_undetermined=ignore_undetermined, language_threshold=lang_thresholds
         ),
         # From FW2: https://github.com/huggingface/fineweb-2/blob/main/fineweb-2-pipeline.py:
         FTFYFormatter(),  # fix encoding issues. Important in a multilingual setting
