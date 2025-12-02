@@ -48,9 +48,23 @@ def yield_repo_parquet_files(
         if skip_dump not in all_dumps:
             raise ValueError(f"Dump {skip_dump} not found in the repository so cannot skip.")
 
-    cfg_parquet_files = [f for f in all_repo_files if f.endswith(".parquet") and f.split("/")[1] not in skip_dumps]
-    if only_dumps:
-        cfg_parquet_files = [f for f in cfg_parquet_files if f.split("/")[1] in only_dumps]
+    # Convert to sets for O(1) lookup instead of O(n) for each file
+    skip_dumps_set = set(skip_dumps)
+    only_dumps_set = set(only_dumps) if only_dumps else None
+
+    cfg_parquet_files = []
+    for f in all_repo_files:
+        if not f.endswith(".parquet"):
+            continue
+        parts = f.split("/")
+        if len(parts) < 2:
+            continue
+        dump = parts[1]
+        if dump in skip_dumps_set:
+            continue
+        if only_dumps_set is not None and dump not in only_dumps_set:
+            continue
+        cfg_parquet_files.append(f)
 
     tmp_dir = str(Path(__file__).parent.parent / "tmp" / "remove_domains")
     for remote_parquet_uri in cfg_parquet_files:

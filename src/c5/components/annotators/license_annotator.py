@@ -323,6 +323,16 @@ def compress_html(soup) -> str:
 NON_VISIBLE_HTML_TAGS = {"script", "style", "head", "title", "meta", "link", "noscript", "template"}
 
 
+def _is_inside_comment(node: Any) -> bool:
+    """Check if a node is inside an HTML comment by walking up the parent tree."""
+    cur = node.parent
+    while cur is not None:
+        if isinstance(cur, Comment):
+            return True
+        cur = cur.parent
+    return False
+
+
 def get_context_text_from_dom(
     start_node: Any,
     direction: Literal["previous", "next"],
@@ -349,24 +359,17 @@ def get_context_text_from_dom(
     else:
         raise ValueError("Direction must be 'previous' or 'next'.")
 
-    final_text = ""
+    text_parts = []
     collected_chars = 0
 
     for node in iterator:
         if collected_chars >= context_length:
-            if direction == "previous":
-                # If we have collected enough characters, cut off
-                # so that the front is trimmed to maintain the context length
-                # closest to the start_node
-                final_text = final_text[-context_length:]
-            else:
-                final_text = final_text[:context_length]
             break
 
         if node.parent and node.parent.name in NON_VISIBLE_HTML_TAGS:
             continue
 
-        if any(isinstance(n, Comment) for n in node.self_and_parents):
+        if _is_inside_comment(node):
             continue
 
         if direction == "next" and start_node in node.parents:
@@ -380,17 +383,23 @@ def get_context_text_from_dom(
             if not text:
                 continue
 
-            if direction == "previous":
-                final_text = f"{text} {final_text}"
-            else:
-                final_text += f" {text}"
+            text_parts.append(text)
+            collected_chars += len(text)
 
-            # Expensive but relevant to ensure a good calculation
-            # of context length without too much whitespace
-            final_text = " ".join(final_text.split())
-            collected_chars = len(final_text)
+    # Join all parts and normalize whitespace once at the end (more efficient)
+    if direction == "previous":
+        final_text = " ".join(reversed(text_parts))
+    else:
+        final_text = " ".join(text_parts)
 
-    return final_text
+    # Normalize whitespace once at the end
+    final_text = " ".join(final_text.split())
+
+    # Trim to context length
+    if direction == "previous":
+        return final_text[-context_length:]
+    else:
+        return final_text[:context_length]
 
 
 def add_license_contexts(licenses: list[License], context_length: int = 120):

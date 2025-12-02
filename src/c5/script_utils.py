@@ -2,7 +2,6 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from aiohttp import ClientTimeout
 import fsspec
 import pyarrow as pa
 from datasets import load_dataset
@@ -20,6 +19,7 @@ from c5.components.filters import CCTextFilter, LanguageFilterWithIgnore, Licens
 from c5.components.readers import RetryWarcReader, RobustJsonlReader
 from c5.data_utils import download_warc_urls_file, get_fw2_language_threshold
 from c5.version import version as c5_version
+
 
 if ver_match := re.match(r"^\d+\.\d+\.\d+", c5_version):
     c5_version = ver_match.group(0)

@@ -1,5 +1,11 @@
+import re
+
 from datatrove.data import Document
 from datatrove.pipeline.filters.base_filter import BaseFilter
+
+
+# Pre-compiled regex for case-insensitive search (more efficient than lowercasing the entire text)
+CC_ORG_PATTERN = re.compile(r"creativecommons\.org", re.IGNORECASE)
 
 
 class EmptyTextFilter(BaseFilter):
@@ -44,7 +50,8 @@ class CCTextFilter(BaseFilter):
           bool | tuple[bool, str]: whether to keep the document or not, and the reason if not
 
         """
-        if "creativecommons.org" not in doc.text.lower():
+        # Use pre-compiled regex for case-insensitive search (faster than lowercasing entire text)
+        if not CC_ORG_PATTERN.search(doc.text):
             return False, "'creativecommons.org' missing"
 
         return True

@@ -93,11 +93,8 @@ class LanguageFilterWithIgnore(LanguageFilter):
 
         lang, script = lang.split("_")
 
-        if not self.label_only:
-            # Loop so we can provide the language that was ignored in reasoning
-            for ignore_lang in self.ignore_language_prefix:
-                if lang == ignore_lang:
-                    return False, f"{lang}_in_ignore_list"
+        if not self.label_only and lang in self.ignore_language_prefix:
+            return False, f"{lang}_in_ignore_list"
 
         doc.metadata["language_script"] = script
         doc.metadata["language"] = lang
