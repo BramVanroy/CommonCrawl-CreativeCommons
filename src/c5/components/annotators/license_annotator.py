@@ -361,9 +361,11 @@ def get_context_text_from_dom(
 
     text_parts = []
     collected_chars = 0
+    # Collect extra raw text to account for whitespace normalization that may reduce length
+    raw_target = int(context_length * 1.5)
 
     for node in iterator:
-        if collected_chars >= context_length:
+        if collected_chars >= raw_target:
             break
 
         if node.parent and node.parent.name in NON_VISIBLE_HTML_TAGS:
